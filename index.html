@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>ジェムラッシュ</title>
+<link rel="stylesheet" href="style.css">
+<script>
+/* 画像素材(ui1〜ui6.png)が同じフォルダにあれば差し替え、無ければ従来の見た目のまま */
+(function(){var h=document.documentElement;['ui1','ui2','ui3','ui4','ui5','ui6'].forEach(function(k){var i=new Image();i.onload=function(){h.classList.add('has-'+k)};i.src=k+'.png'})})();
+</script>
+</head><body>
+<div id="app"><video id="hv" src="haike1.mp4" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture></video><div id="cl" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="clb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b class="tx tt">キャラクター<em id="clc"></em></b><button class="tbb r" id="clh" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="cg"></div>
+</div>
+<div id="dt" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="dtb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="tbb r" id="dth" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="dl"><h2 id="dn" class="tx"></h2><div id="dr"><span></span></div><div id="dk"><div class="rk"><i><small>ランク</small><b></b></i></div><div class="trb tx"><span id="dkt"></span></div></div><p id="dd"></p>
+  <div id="dbt"><button class="dbn y tx" id="dsel">選択</button><button class="dbn b tx" id="dtry">試す</button></div></div>
+ <div id="drt"><button id="di" aria-label="説明">i</button>
+  <div class="sr a" id="sra"><div class="si">💥</div><div class="sx"><small>攻撃性</small><div class="sb"></div></div></div>
+  <div class="sr d" id="srd"><div class="si">💚</div><div class="sx"><small>防衛性</small><div class="sb"></div></div></div>
+  <div class="sr u" id="sru"><div class="si">🔧</div><div class="sx"><small>有用性</small><div class="sb"></div></div></div>
+  <div class="sr s"><div class="si">💀</div><div class="sx"><small>必殺技</small><b id="dsn"></b></div></div></div>
+ <div id="dp" hidden><div id="dpw"><div id="dpc"><div id="dph"><b>キャラクターステータス</b></div><div id="dpb"></div></div><button id="dx" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M5.5 6.7l13 13M18.5 6.7l-13 13" stroke="#8c1019" stroke-width="5.4" stroke-linecap="round"/><path d="M5.5 5l13 13M18.5 5l-13 13" stroke="#fff" stroke-width="5.4" stroke-linecap="round"/></svg></button></div></div>
+</div>
+<div id="home" class="ov">
+ <button id="hc"><span id="hci"></span><b class="tx">キャラクター</b></button>
+ <button id="hmp" aria-label="マルチプレイ"><span id="hmpi">👥</span><b class="tx">マルチプレイ</b></button>
+ <div id="hm">
+  <svg class="gm" viewBox="0 0 64 64" aria-hidden="true">
+   <path class="sp" d="M9 3.5Q9 10 2.5 10Q9 10 9 16.5Q9 10 15.5 10Q9 10 9 3.5Z" fill="#fff"/>
+   <path class="sp" d="M24 0Q24 4.5 19.5 4.5Q24 4.5 24 9Q24 4.5 28.5 4.5Q24 4.5 24 0Z" fill="#dfe6ff"/>
+   <g stroke="#1b0a33" stroke-width="2" stroke-linejoin="round">
+    <path d="M38 14 16 27 38 39Z" fill="#a66bff"/>
+    <path d="M38 14 60 27 38 39Z" fill="#c9a0ff"/>
+    <path d="M60 27V52L38 39Z" fill="#7a35d8"/>
+    <path d="M60 52 38 64 38 39Z" fill="#5a1fb0"/>
+    <path d="M38 64 16 52 38 39Z" fill="#6a28c4"/>
+    <path d="M16 52V27L38 39Z" fill="#8a45e8"/>
+   </g>
+   <path d="M38 14 60 27V52L38 64 16 52V27Z" fill="none" stroke="#1b0a33" stroke-width="3.6" stroke-linejoin="round"/>
+   <path d="M38 19.5 51 27.2 38 34 28 28Z" fill="#f1dcff" opacity=".55"/>
+  </svg><span class="gi" aria-hidden="true"></span>
+  <div class="hmx"><b class="tx">エメラルドハント</b></div>
+  <button id="hmi" aria-label="イベント情報">i</button>
+</div>
+ <button id="hp" class="tx">プレイ</button>
+</div>
+<div id="mr" class="ov" hidden>
+ <div class="mrbg"></div>
+ <button id="mrb" class="mrk" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+ <div id="mrs" class="tx"></div>
+ <button id="mri" aria-label="説明">i</button>
+ <div id="mrpn"><div id="mra" class="mrrow"></div><div id="mrb2" class="mrrow"></div></div>
+ <button id="mrg" class="tx" hidden>準備完了</button>
+ <div id="mrb3" class="tx" hidden></div>
+ <div id="mrw" hidden><i class="spin"></i><b id="mrwt" class="tx"></b></div>
+ <div id="mrh" hidden><div class="mrhc"><b class="tx">あそびかた</b><p>・「？」の枠(BOT)をタップ → そこへ移動</p><p>・人のいる枠をタップ → 場所を交代</p><p>・上がAチーム／下がBチーム。空いた枠はBOTが入ります</p><p>・オレンジの人(リーダー)が「開始」で試合スタート</p><p>・自分の枠をタップすると名前を変えられます</p></div></div>
+</div>
+<div id="mrt" class="tx"></div>
+<div id="hud" class="ov" hidden>
+ <div id="top"><div class="s"><div class="hx"><b id="gb">0</b></div><div class="bar" id="bb"></div></div><div id="clock">3:00</div><div class="s r"><div class="hx r"><b id="gr">0</b></div><div class="bar r" id="br"></div></div></div>
+ <div id="cdb"></div><div id="msg"></div><div id="zl"></div><div id="joy"><i></i></div>
+ <div id="sup" class="btn"><b style="font-size:32px">💀</b></div>
+ <div id="atk" class="btn"><b style="font-size:48px;opacity:.5">⌖</b><div id="ammo" hidden><i></i><i></i><i></i></div></div>
+</div>
+<div id="vs" class="ov" hidden><div id="vsr"><i class="vbn"></i><div class="vpr"></div></div><div id="vsb"><i class="vbn"></i><div class="vpr"></div></div><b id="vst">VS</b></div>
+<div id="bt" class="ov" hidden><b>BATTLE!!</b></div>
+<div id="end" class="ov" hidden><h1 id="et"></h1><div id="etr" class="tx"></div><div id="rp"></div><button id="endb" class="tx">終了</button></div></div>
+
+<script>window.MPG={on:false};</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="balance.js"></script>
+<script src="models.js"></script>
+<script src="vfx.js"></script>
+<script src="script.js"></script>
+<script src="firebase-config.js"></script>
+<script src="mp-net.js"></script>
+<script src="mp-game.js"></script>
+<script src="mp-ui.js"></script>
+</body></html>
