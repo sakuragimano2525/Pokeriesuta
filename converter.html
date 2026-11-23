@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bedrock → ゲーム変換ツール</title>
+<style>
+:root{color-scheme:dark;--bg:#140b24;--pn:#2a1850;--bd:#4a2f85;--gold:#ffd23f;--ok:#6dff7a}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{margin:0;padding:14px;background:var(--bg);color:#fff;font:600 14px/1.5 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;max-width:760px;margin:auto}
+h1{font-size:20px;margin:4px 0 10px}h1 small{display:block;font-size:12px;color:var(--gold)}
+#drop{border:3px dashed var(--bd);border-radius:16px;padding:22px 12px;text-align:center;background:#1d1138;cursor:pointer}
+#drop.hot{border-color:var(--gold);background:#3a2270}#drop small{color:#c8b8ff}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{padding:3px 10px;border-radius:99px;background:var(--pn);border:2px solid var(--bd);font-size:12px}.chip.ok{border-color:var(--ok);color:var(--ok)}
+canvas{width:100%;aspect-ratio:1.8/1;height:auto;border-radius:14px;background:radial-gradient(#3a2270,#1d0f3a);touch-action:none;display:block}
+.row{display:flex;gap:8px;margin:8px 0}
+button{font:inherit;border:0;border-radius:12px;padding:9px 14px;background:var(--pn);color:#fff;border:2px solid var(--bd)}
+.row button{flex:1}button.on{border-color:var(--gold);background:#4a2a96}
+#cfg{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--pn);border:2px solid var(--bd);border-radius:14px;padding:10px}
+#cfg label{display:flex;flex-direction:column;font-size:12px;color:#d8c8ff;gap:2px}
+#cfg input,#cfg select{font:inherit;padding:6px;border-radius:8px;border:2px solid var(--bd);background:#140b24;color:#fff;width:100%}
+.big{display:block;width:100%;margin-top:12px;padding:13px;font-size:18px;color:#3b2200;background:linear-gradient(#ffe46b,#ffa800);border:0;box-shadow:0 4px 0 #b36b00}
+.big:disabled{filter:grayscale(1);opacity:.5}
+#slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
+#slots .sl{position:relative;padding:8px 10px;border-radius:12px;background:var(--pn);border:2px solid var(--bd);cursor:pointer}
+#slots .sl b{display:block}#slots .sl small{color:#c8b8ff;font-size:11px}
+#slots .sl.has{border-color:#6aa6ff}#slots .sl.new{border-color:var(--ok)}#slots .sl.cur{box-shadow:0 0 0 3px var(--gold)}
+#slots .bt{display:flex;gap:6px;margin-top:5px}#slots .bt u,#slots .bt i{font-style:normal;text-decoration:none;padding:1px 10px;border-radius:8px;background:#0008;font-size:11px}#slots .bt u{color:#9fd8ff}#slots .bt i{color:#ffb3b3}
+.sh{margin-top:16px;font-weight:800}.sh small{color:var(--gold);margin-left:8px;font-weight:600}.mut{color:#c8b8ff;font-size:12px}
+#reg{grid-column:1/-1;background:linear-gradient(#7dff8a,#25c24a);color:#06280f;border:2px solid #0b5a1f;font-weight:800;font-size:15px}
+#reg:disabled{filter:grayscale(1);opacity:.5}
+#cam .cg3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;background:var(--pn);border:2px solid var(--bd);border-radius:14px;padding:8px 10px}
+#cam .cg3 label{display:flex;flex-direction:column;font-size:12px;color:#d8c8ff}#cam input[type=range]{width:100%}
+#cam .ck{display:flex;align-items:center;gap:6px;flex:none;font-size:13px}#cam select{font:inherit;padding:8px;border-radius:10px;border:2px solid var(--bd);background:#140b24;color:#fff;flex:1;min-width:0}
+.snap{background:linear-gradient(#8fd8ff,#2a86e8)!important;color:#05213f!important;box-shadow:0 4px 0 #0b4a8f!important}
+#log{font-size:12px;color:#c8b8ff;white-space:pre-wrap;margin:10px 0}
+</style></head><body>
+<h1><small>Minecraft Bedrock → ブロスタ風ゲーム</small>キャラ変換ツール</h1>
+<div id="drop">ここに <b>geo.json / animation.json / PNG</b> をまとめてドロップ<br><small>1体ずつ「登録」→ 次のキャラのファイルを入れて「登録」… と繰り返し、最後に1回で全員まとめて出力できます</small><br><small>ゲームの <b>script.js</b>（キャラ一覧用）と <b>models.js</b>（出力先）も一緒にドロップ ・ 同じフォルダで開けば自動で読み込み ・ 順番や名前は自動判別</small>
+<input type="file" id="fi" multiple hidden></div>
+<div id="chips"></div>
+<canvas id="cv"></canvas>
+<div class="row"><button data-m="0" class="on">待機</button><button data-m="1">歩行</button><button id="bat">攻撃</button></div>
+<div id="cam" hidden>
+ <div class="sh">📷 撮影<small>一覧アイコン用 ch<span id="chn">X</span>.png ／ 比率 1.8:1 ／ 上のプレビュー枠がそのまま写真になります</small></div>
+ <div class="cg3"><label>ズーム<input id="zm" type="range" min="40" max="300" value="100"></label><label>左右<input id="px" type="range" min="-100" max="100" value="0"></label><label>上下<input id="py" type="range" min="-100" max="100" value="0"></label></div>
+ <div class="row"><label class="ck"><input type="checkbox" id="ar" checked>自動回転</label><select id="bg"><option value="clear">背景：透明</option><option value="blue">背景：水色（カード色）</option></select><button id="af">自動フレーミング</button></div>
+ <button class="big snap" id="snap">📷 写真を撮って chX.png を保存</button>
+</div>
+<div id="cfg" hidden>
+ <label>差し替えるキャラ<select id="slot"></select></label>
+ <label>大きさ (スケール)<input id="sc" type="number" step="0.001"></label>
+ <label>待機アニメ<select id="idle"></select></label>
+ <label>歩行アニメ<select id="walk"></select></label>
+ <label>攻撃アニメ<select id="atk"></select></label>
+ <label>攻撃で動かさないボーン<input id="skip" placeholder="例: flame"></label>
+ <label>攻撃 開始秒<input id="a0" type="number" step="0.05"></label>
+ <label>攻撃 終了秒<input id="a1" type="number" step="0.05"></label>
+ <button id="reg" disabled>✔ このモデルを選んだキャラに登録</button>
+</div>
+<div class="sh">キャラ一覧<small>タップ＝そのキャラを選択（変換済みなら呼び出して再編集）／✕＝元の内蔵モデルに戻す</small></div>
+<div id="slots"></div>
+<button class="big" id="dl" disabled>まとめて変換して models.js をダウンロード</button>
+<div id="log"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const T=THREE,$=s=>document.querySelector(s);
+/* ===== ローダー本体：プレビューとゲームに“同じコード”を使う（toStringでゲームへ埋め込み） ===== */
+function makeGO(T,GOD,tmat,OL){
+ const D=Math.PI/180,V=a=>[a[0],a[1],-a[2]],setR=(o,r)=>o.rotation.set(r[0]*D,-r[1]*D,-r[2]*D);
+ const Q={anim_time:0,life_time:0},M={sin:x=>Math.sin(x*D),cos:x=>Math.cos(x*D),abs:Math.abs,min:Math.min,max:Math.max,sqrt:Math.sqrt,pow:Math.pow,floor:Math.floor,ceil:Math.ceil,round:Math.round,pi:Math.PI,clamp:(x,a,b)=>Math.min(b,Math.max(a,x)),lerp:(a,b,t)=>a+(b-a)*t,mod:(a,b)=>a%b};
+ const mol=s=>{if(typeof s=='number')return()=>s;const j=String(s).toLowerCase().replace(/\bquery\./g,'Q.').replace(/\bq\./g,'Q.').replace(/\bmath\./g,'M.');
+  if(!/^[\w\s.+\-*\/()%,]*$/.test(j))return()=>0;try{const f=new Function('Q','M','return ('+j+')');f(Q,M);return()=>f(Q,M)}catch(e){return()=>0}};
+ function cubeGeo(c,TW,TH){
+  const[w,h,d]=c.size,inf=c.inflate||0,o=c.origin,mir=!!c.mirror;
+  const x0=o[0]-inf,x1=o[0]+w+inf,y0=o[1]-inf,y1=o[1]+h+inf,z0=-(o[2]+d)-inf,z1=-o[2]+inf,W=x1-x0,H=y1-y0,Dp=z1-z0;
+  const cx=(x0+x1)/2,cy=(y0+y1)/2,cz=(z0+z1)/2,uv=c.uv||[0,0],pf=!Array.isArray(uv);let u=0,v=0;if(!pf)[u,v]=uv;
+  const tl={north:[u+d,v+d,w,h],south:[u+2*d+w,v+d,w,h],east:[u,v+d,d,h],west:[u+d+w,v+d,d,h],up:[u+d,v,w,d],down:[u+d+w,v,w,d]};
+  const F=[['north',[x0,y1,z1],[1,0,0],[0,-1,0],W,H],['south',[x1,y1,z0],[-1,0,0],[0,-1,0],W,H],['east',[x0,y1,z0],[0,0,1],[0,-1,0],Dp,H],
+   ['west',[x1,y1,z1],[0,0,-1],[0,-1,0],Dp,H],['up',[x0,y1,z0],[1,0,0],[0,0,1],W,Dp],['down',[x0,y0,z1],[1,0,0],[0,0,-1],W,Dp]];
+  const P=[],UV=[],I=[],pfT=n=>{const q=uv[n];if(!q)return[0,0,0,0];const z=q.uv_size||(n=='east'||n=='west'?[d,h]:n=='up'||n=='down'?[w,d]:[w,h]);return[q.uv[0],q.uv[1],z[0],z[1]]};
+  for(const[n,t,r,dn,rl,dl]of F){if(rl<=0||dl<=0)continue;
+   let k=n;if(mir&&n=='east')k='west';else if(mir&&n=='west')k='east';
+   const[tx,ty,tw,th]=pf?pfT(n):tl[k];
+   let a=tx,b=tx+tw;if(mir&&!pf)[a,b]=[b,a];
+   const TL=t,TR=t.map((e,i)=>e+r[i]*rl),BL=t.map((e,i)=>e+dn[i]*dl),BR=TR.map((e,i)=>e+dn[i]*dl),n0=P.length/3;
+   [[TL,a,ty],[BL,a,ty+th],[BR,b,ty+th],[TR,b,ty]].forEach(([p,pu,pv])=>{P.push(p[0]-cx,p[1]-cy,p[2]-cz);UV.push(pu/TW,1-pv/TH)});
+   I.push(n0,n0+1,n0+2,n0,n0+2,n0+3)}
+  const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(P,3));g.setAttribute('uv',new T.Float32BufferAttribute(UV,2));g.setIndex(I);g.computeVertexNormals();
+  return{g,c:[cx,cy,cz],s:[W,H,Dp]}}
+ const chan=v=>{if(typeof v=='number'||typeof v=='string')v=[v,v,v];return Array.isArray(v)?{f:v.map(mol)}:{ks:Object.entries(v).map(([t,a])=>({t:+t,f:(Array.isArray(a)?a:a.post||a.pre||[0,0,0]).map(mol)})).sort((a,b)=>a.t-b.t)}};
+ const ev=(f,t)=>{Q.anim_time=Q.life_time=t;return f.map(g=>g())};
+ function samp(ch,t){if(ch.f)return ev(ch.f,t);const k=ch.ks;if(t<=k[0].t)return ev(k[0].f,t);if(t>=k[k.length-1].t)return ev(k[k.length-1].f,t);
+  for(let i=0;i<k.length-1;i++)if(t<=k[i+1].t){const q=(t-k[i].t)/(k[i+1].t-k[i].t),a=ev(k[i].f,t),b=ev(k[i+1].f,t);return a.map((x,j)=>x+(b[j]-x)*q)}}
+ const LP=new WeakMap(),pose=(c,t)=>{const o={};if(!c)return o;const LL=LP.get(c);if(LL>0)t=t%LL;for(const b in c){o[b]={};for(const k in c[b])o[b][k]=samp(c[b][k],t)}return o};
+ const ID={rotation:[0,0,0],position:[0,0,0],scale:[1,1,1]};
+ function mix(A,B,w,skip){const o={...A};for(const b in B){if(b==skip)continue;const a=A[b]||{},r={};for(const k in ID){const x=a[k]||ID[k],y=B[b][k]||ID[k];r[k]=x.map((e,i)=>e+(y[i]-e)*w)}o[b]={...a,...r}}return o}
+ const cache={};
+ function prep(id){if(cache[id])return cache[id];const d=GOD[id],G=d.geo['minecraft:geometry'][0],TW=G.description.texture_width,TH=G.description.texture_height,tex=new T.Texture(),im=new Image();
+  im.onload=()=>{tex.image=im;tex.needsUpdate=true};im.src=d.png;tex.magFilter=tex.minFilter=T.NearestFilter;tex.encoding=T.sRGBEncoding;
+  const clips={};for(const[n,a]of Object.entries(d.anim.animations)){const c={};for(const[b,v]of Object.entries(a.bones||{})){c[b]={};for(const k in v)c[b][k]=chan(v[k])}let LL=+a.animation_length||0;if(!LL)for(const bv of Object.values(a.bones||{}))for(const vv of Object.values(bv))if(vv&&typeof vv=='object'&&!Array.isArray(vv))for(const kk in vv)LL=Math.max(LL,+kk||0);LP.set(c,a.loop===true?LL:0);clips[n]=c}
+  return cache[id]={G,TW,TH,tex,clips,c:d.cfg}}
+ /* ===== 自動フィット =====
+    idleで浮遊したときの「一番低い位置」を地面のすぐ上(HOVER)に合わせ、浮きすぎ/めり込みを自動補正。
+    大きすぎるモデルは MAXH(高さ) / MAXW(横幅・はみ出す武器や尻尾は除外)に収まるまで縮小(拡大はしない)。
+    数値はワールド単位。好みに合わせてここだけ調整してください。 */
+ const FIT={HOVER:.08,MAXH:1.75,MAXW:1.9};
+ function fitModel(R,grp,m,SC){
+  if(!m.fit){
+   let k=1,y=4*SC;
+   try{
+    const I=m.clips[m.c.idle],tv=new T.Vector3(),inv=new T.Matrix4(),mm=new T.Matrix4(),xs=[],zs=[];let lo=1e9,hi=-1e9;
+    for(let t=0,n=0;t<30;t+=.25,n++){ /* idleを30秒ぶん走査して最下点・最上点・横幅を測る(周期の違う揺れも拾う) */
+     apply(R,pose(I,t));grp.updateMatrixWorld(true);inv.copy(grp.matrixWorld).invert();
+     for(const me of R.meshes){mm.multiplyMatrices(inv,me.matrixWorld);if(Math.abs(mm.determinant())<1e-9)continue;
+      const p=me.geometry.attributes.position;
+      for(let i=0;i<p.count;i++){tv.fromBufferAttribute(p,i).applyMatrix4(mm);if(tv.y<lo)lo=tv.y;if(tv.y>hi)hi=tv.y;if(n%4==0){xs.push(tv.x);zs.push(tv.z)}}}}
+    const q=(a,f)=>{a=Float32Array.from(a).sort();return a[Math.min(a.length-1,Math.floor(a.length*f))]};
+    const h=(hi-lo)*SC,w=Math.max(q(xs,.97)-q(xs,.03),q(zs,.97)-q(zs,.03))*SC;
+    const kk=Math.min(1,FIT.MAXH/h,FIT.MAXW/w),yy=FIT.HOVER-lo*SC*kk;
+    if(isFinite(kk)&&isFinite(yy)&&kk>0){k=kk;y=yy}
+    apply(R,pose(I,0));
+   }catch(e){console.error(e)}
+   m.fit={k,y}}
+  grp.scale.setScalar(SC*m.fit.k);grp.position.set(0,m.fit.y,0)}
+ function build(body,id){
+  const m=prep(id),G=m.G,SC=m.c.sc,grp=new T.Group();grp.scale.setScalar(SC);grp.position.y=4*SC;body.add(grp);
+  const mt=tmat(0xffffff,{gl:.3,rim:.3});mt.map=mt.emissiveMap=m.tex;mt.alphaTest=.5;
+  const nodes={},R={nodes,m,t:0,ww:0,a:null,pf:0,meshes:[]};
+  for(const b of G.bones){const g=new T.Group();g.rotation.order='ZYX';g.userData.pv=V(b.pivot||[0,0,0]);g.userData.rest=b.rotation||[0,0,0];nodes[b.name]=g}
+  for(const b of G.bones){const g=nodes[b.name],par=b.parent&&nodes[b.parent],pv=g.userData.pv,pp=par?par.userData.pv:[0,0,0];
+   (par||grp).add(g);g.userData.base=[pv[0]-pp[0],pv[1]-pp[1],pv[2]-pp[2]];g.position.set(...g.userData.base);setR(g,g.userData.rest);
+   for(const c of b.cubes||[]){const{g:geo,c:ce,s}=cubeGeo(c,m.TW,m.TH),me=new T.Mesh(geo,mt);me.castShadow=true;me.userData.e=.3;R.meshes.push(me);
+    if(c.rotation){const cp=V(c.pivot||b.pivot||[0,0,0]),cg=new T.Group();cg.rotation.order='ZYX';cg.position.set(cp[0]-pv[0],cp[1]-pv[1],cp[2]-pv[2]);setR(cg,c.rotation);
+     me.position.set(ce[0]-cp[0],ce[1]-cp[1],ce[2]-cp[2]);cg.add(me);g.add(cg)}
+    else{me.position.set(ce[0]-pv[0],ce[1]-pv[1],ce[2]-pv[2]);g.add(me)}}}
+  fitModel(R,grp,m,SC);
+  return R}
+ function tick(R,u,dt){
+  const m=R.m,c=m.c,I=m.clips[c.idle],Wk=m.clips[c.walk]||I,At=m.clips[c.atk],a0=c.a0,a1=c.a1,sk=c.skip||'';
+  if(u&&(u.fz>0||!u.alive))dt=0;R.t+=dt;
+  R.ww+=(((u&&u.mvg)?1:0)-R.ww)*Math.min(1,dt*9);
+  let a=R.a;
+  if(u){if(At&&u.lp){if(!a||a.k!='leap')a=R.a={k:'leap',w:0,ct:a0}}
+   else if(a&&a.k=='leap'&&!a.e)a.e=1;
+   else if(At&&!a&&u.fa>R.pf+.15)a=R.a={k:'punch',t:0,w:0,ct:a0};
+   R.pf=u.fa}
+  if(a){if(a.k=='leap'){if(u&&u.lp){a.ct=a0+(a1-a0)*Math.min(1,u.lp.t/u.lp.T);a.w=Math.min(1,a.w+dt*8)}else{a.ct=Math.min(a1,a.ct+dt*(a1-a0)*2);a.w-=dt*4;if(a.w<=0)R.a=a=null}}
+   else{a.t+=dt;const p=a.t/.45;a.ct=a0+(a1-a0)*Math.min(1,p);a.w=a.t<.07?a.t/.07:p<.7?1:Math.max(0,(1-p)/.3);if(p>=1)R.a=a=null}}
+  let P=pose(I,R.t);if(R.ww>.01)P=mix(P,pose(Wk,R.t*1.7),R.ww);
+  if(a)P=mix(P,pose(At,a.ct),a.w,sk);
+  apply(R,P)}
+ function apply(R,P){for(const b in P){const g=R.nodes[b];if(!g)continue;const p=P[b],r=p.rotation||ID.rotation,s=p.scale||ID.scale,o=p.position||ID.position,rs=g.userData.rest,bs=g.userData.base;
+   setR(g,[rs[0]+r[0],rs[1]+r[1],rs[2]+r[2]]);g.scale.set(s[0],s[1],s[2]);g.position.set(bs[0]+o[0],bs[1]+o[1],bs[2]-o[2])}}
+ return{build,tick}}
+
+/* ===== 状態・ファイル自動判別 ===== */
+const MK_CH=['const C','H=['].join(''),MK_GOD=['const G','OD='].join(''),MK_GO=['const G','O=('].join('');
+const S={geo:null,anim:null,png:null,game:null,models:null,slots:{},chars:null,dirty:false},log=t=>$('#log').textContent=t;
+const rd=(f,m)=>new Promise(r=>{const x=new FileReader();x.onload=()=>r(x.result);m?x.readAsDataURL(f):x.readAsText(f)});
+async function ingest(files){
+ for(const f of files){
+  if(f.type.startsWith('image/')||/\.(png|webp)$/i.test(f.name)){S.png=await rd(f,1);S.dirty=true;continue}
+  const t=await rd(f);
+  if(t.includes(MK_GOD)){setModels(t,f.name);if(!t.includes(MK_CH))continue}
+  if(t.includes(MK_CH)){setGame(t,f.name);continue}
+  try{const j=JSON.parse(t);
+   if(j['minecraft:geometry']){S.geo=j;S.dirty=true}
+   else{const k=Object.keys(j).find(x=>/^geometry\./.test(x));
+    if(k){S.dirty=true;const v=j[k];S.geo={format_version:'1.12.0','minecraft:geometry':[{description:{identifier:k,texture_width:v.texturewidth||64,texture_height:v.textureheight||64},bones:v.bones}]}}
+    else if(j.animations){S.anim=j;S.dirty=true}else log('判別できないJSON: '+f.name)}
+  }catch(e){log('読み込めません: '+f.name)}}
+ refresh()}
+function readGOD(s){const gi=s.indexOf(MK_GOD);if(gi<0)return null;const ge=s.indexOf('\n',gi);let cur;
+ try{cur=JSON.parse(s.slice(gi+MK_GOD.length,ge).replace(/;\s*$/,''))}catch(e){throw Error('ゲーム内の GOD を読み取れません（既存モデルを壊さないため中止）')}
+ if(cur.geo){const k=Object.keys(cur.anim.animations),f=x=>k.find(n=>n.endsWith('.'+x))||'';
+  cur={2:{...cur,cfg:{sc:.024,idle:f('idle'),walk:f('walk'),atk:f('physical'),a0:.85,a1:1.5,skip:'flame'}}}}
+ return cur}
+const EXTRA=[{id:'12t',n:'セイリュウ（変身後）',after:'12'}];   /* 変身後モデル用の追加スロット(ゲーム側は GOD['12t'] を読む) */
+function setGame(t,name){S.game=t;S.gn=name;try{localStorage.setItem('bconv-game',JSON.stringify({t,name}))}catch(e){}
+ S.chars=[...t.matchAll(/\{id:(\d+),n:'([^']*)'/g)].map(m=>({id:m[1],n:m[2]}));
+ for(const x of EXTRA){const i=S.chars.findIndex(m=>m.id==x.after);if(i>=0)S.chars.splice(i+1,0,{id:x.id,n:x.n})}
+ if(t.includes(MK_GOD)){S.models=t;S.mn=name}
+ syncSlots();fillSel();refresh()}
+function setModels(t,name){S.models=t;S.mn=name;try{localStorage.setItem('bconv-models',JSON.stringify({t,name}))}catch(e){}
+ syncSlots();refresh()}
+function fillSel(){const sel=$('#slot'),old=sel.value;sel.innerHTML=S.chars.map(m=>`<option value="${m.id}">${m.n}（id ${m.id}）</option>`).join('');sel.value=old||'2';if(!sel.value)sel.selectedIndex=0}
+/* models.js の GOD から、変換済みモデルをスロットとして読み込む（未出力の登録分は残す） */
+function syncSlots(){if(!S.models)return;
+ try{const cur=readGOD(S.models)||{};for(const id of Object.keys(S.slots))if(S.slots[id].src=='game')delete S.slots[id];
+  for(const id of Object.keys(cur))if(!S.slots[id])S.slots[id]={geo:cur[id].geo,anim:cur[id].anim,png:cur[id].png,cfg:cur[id].cfg,src:'game'}}catch(e){log(e.message)}}
+/* ---- キャラ一覧パネル／登録／呼び出し ---- */
+const slotName=id=>(S.chars.find(m=>m.id==id)||{n:'id'+id}).n;
+function renderSlots(){const el=$('#slots');
+ if(!S.chars){el.innerHTML='<span class="mut">ゲームの script.js と models.js を入れると、ここにキャラ一覧が出ます（セイリュウの変身後モデルは「セイリュウ（変身後）」に登録）</span>';return}
+ const tgt=$('#slot').value,lab={game:'変換モデル（ゲーム内）',new:'登録済み（未出力）',out:'出力済み'};
+ el.innerHTML=S.chars.map(m=>{const s=S.slots[m.id];
+  return `<div class="sl ${s?(s.src=='new'?'new':'has'):''} ${m.id==tgt?'cur':''}" data-id="${m.id}"><b>${m.n}</b><small>${s?lab[s.src]:'内蔵モデル'}</small>${s?`<span class="bt"><u data-r="${m.id}">呼出</u><i data-x="${m.id}">✕</i></span>`:''}</div>`}).join('')}
+$('#slots').onclick=e=>{const x=e.target.dataset.x,r=e.target.dataset.r;
+ if(x!=null){delete S.slots[x];renderSlots();updateDl();log('「'+slotName(x)+'」を内蔵モデルに戻します（出力すると反映）');return}
+ if(r!=null){$('#slot').value=r;loadSlot(S.slots[r],r);return}
+ const d=e.target.closest('.sl');if(!d)return;const id=d.dataset.id;$('#slot').value=id;
+ const s=S.slots[id],fresh=S.dirty&&S.geo&&S.anim&&S.png;
+ if(s&&!fresh)loadSlot(s,id);   /* 未登録の新しいモデルを編集中なら上書きせず、登録先だけ変える */
+ else{renderSlots();updateReg();log(fresh?'登録先を「'+slotName(id)+'」にしました。「登録」を押してください':'「'+slotName(id)+'」を選択しました。モデルのファイルを入れて「登録」してください')}};
+$('#slot').onchange=()=>{renderSlots();updateReg()};
+function loadSlot(s,id){S.geo=s.geo;S.anim=s.anim;S.png=s.png;sig='';refresh();
+ const g=s.cfg||{};for(const[k,v]of[['idle',g.idle],['walk',g.walk],['atk',g.atk]])if(v!=null)$('#'+k).value=v;
+ $('#sc').value=g.sc;$('#skip').value=g.skip||'';$('#a0').value=g.a0||0;$('#a1').value=g.a1||0;rebuild();S.dirty=false;
+ log('「'+slotName(id)+'」のモデルを呼び出しました。調整して「登録」で上書きできます')}
+function register(auto){const id=$('#slot').value;if(!(S.geo&&S.anim&&S.png)||id==='')return;
+ S.slots[id]={geo:S.geo,anim:S.anim,png:S.png,cfg:cfg(),src:'new'};S.dirty=false;
+ if(!auto){S.geo=S.anim=S.png=null;sig='';if(holder){sc3.remove(holder);holder=rig=null}
+  refresh();log('「'+slotName(id)+'」に登録しました（登録中 '+Object.keys(S.slots).length+'体）。次のキャラのファイルを入れるか、下のボタンで出力できます')}
+ else renderSlots()}
+$('#reg').onclick=()=>register();
+function updateReg(){const cn=$('#slot').value!==''&&S.chars?$('#slot').value:'X';$('#chn').textContent=cn;$('#snap').textContent='📷 写真を撮って ch'+cn+'.png を保存';$('#reg').disabled=!(S.geo&&S.anim&&S.png&&$('#slot').value!=='');$('#reg').textContent='✔ このモデルを「'+($('#slot').value!==''&&S.chars?slotName($('#slot').value):'選んだキャラ')+'」に登録'}
+function updateDl(){const n=Object.keys(S.slots).length;$('#dl').disabled=!S.models;$('#dl').textContent='まとめて変換して models.js をダウンロード（変換モデル '+n+'体'+(S.dirty&&S.geo&&S.anim&&S.png?' ＋ 編集中の1体':'')+'）'}
+const names=()=>S.anim?Object.keys(S.anim.animations):[];
+const clipLen=n=>{const a=S.anim.animations[n];if(!a)return 1;if(a.animation_length)return a.animation_length;let m=0;for(const b of Object.values(a.bones||{}))for(const v of Object.values(b))if(v&&typeof v=='object'&&!Array.isArray(v))for(const k in v)m=Math.max(m,+k||0);return m||1};
+function chips(){const c=(ok,t)=>`<span class="chip ${ok?'ok':''}">${ok?'✓':'・'} ${t}</span>`;
+ $('#chips').innerHTML=c(S.geo,'geo.json')+c(S.anim,'animation'+(S.anim?'（'+names().length+'個）':''))+c(S.png,'テクスチャPNG')+c(S.game,'script.js'+(S.gn?'：'+S.gn:''))+c(S.models,'models.js'+(S.mn?'：'+S.mn:''))}
+let sig='';
+function refresh(){chips();const ready=S.geo&&S.anim&&S.png;$('#cfg').hidden=!ready;$('#cam').hidden=!ready;
+ updateDl();updateReg();renderSlots();
+ if(!ready){log('geo.json・animation.json・PNG の3つを入れてください');return}
+ const nm=names(),k=nm.join('|')+(S.geo['minecraft:geometry'][0].description.identifier);
+ if(k!=sig){sig=k;const o=nm.map(n=>`<option>${n}</option>`).join('');
+  $('#idle').innerHTML=o;$('#walk').innerHTML=o;$('#atk').innerHTML='<option value="">（なし）</option>'+o;
+  const pick=re=>nm.find(n=>re.test(n)),idle=pick(/idle|stand|wait|breath/i)||nm[0],walk=pick(/walk|run|move/i)||idle,
+   atk=pick(/attack|atk|physical|punch|hit|slash|shoot|strike|swing/i)||nm.find(n=>n!=idle&&n!=walk)||'';
+  $('#idle').value=idle;$('#walk').value=walk;$('#atk').value=atk;
+  const G=S.geo['minecraft:geometry'][0];let my=0,bones=[];for(const b of G.bones){bones.push(b.name);for(const c of b.cubes||[])my=Math.max(my,c.origin[1]+c.size[1])}
+  $('#sc').value=my>0?Math.round(2/my*1e4)/1e4:.024;$('#skip').value=bones.includes('flame')?'flame':'';setAtkTime()}
+ rebuild();
+ log('自動設定しました。プレビューで動きを確認 →'+(S.game?' 「ダウンロード」で完成':'（ゲームの script.js と models.js も入れるとダウンロードできます）'))}
+function setAtkTime(){const a=$('#atk').value;$('#a0').value=0;$('#a1').value=a?Math.round(clipLen(a)*100)/100:0}
+$('#atk').onchange=()=>{setAtkTime();S.dirty=true;updateDl();rebuild()};
+['idle','walk','sc','skip','a0','a1'].forEach(i=>$('#'+i).onchange=()=>{S.dirty=true;updateDl();rebuild()});
+
+/* ===== プレビュー（ゲームと同じローダーで再生） ===== */
+const rn=new T.WebGLRenderer({canvas:$('#cv'),antialias:true,alpha:true}),sc3=new T.Scene(),cam=new T.PerspectiveCamera(38,1,.1,50);
+rn.outputEncoding=T.sRGBEncoding;cam.position.set(0,1.5,5);cam.lookAt(0,1,0);
+sc3.add(new T.HemisphereLight(0xffffff,0x6644aa,.9));const dl=new T.DirectionalLight(0xffffff,.8);dl.position.set(3,6,4);sc3.add(dl);
+const fl=new T.Mesh(new T.CircleGeometry(2,40),new T.MeshBasicMaterial({color:0x5b2bb5,transparent:true,opacity:.5}));fl.rotation.x=-Math.PI/2;sc3.add(fl);
+const U={fz:0,alive:true,mvg:false,lp:null,fa:0};let GO,rig,holder,ry=0,drag=null;
+const cfg=()=>({sc:+$('#sc').value||.024,idle:$('#idle').value,walk:$('#walk').value,atk:$('#atk').value,a0:+$('#a0').value||0,a1:+$('#a1').value||0,skip:$('#skip').value.trim()});
+function rebuild(){if(holder)sc3.remove(holder);
+ try{GO=makeGO(T,{0:{geo:S.geo,anim:S.anim,png:S.png,cfg:cfg()}},()=>new T.MeshLambertMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:.35}),new T.MeshBasicMaterial({color:0x120818,side:T.BackSide}));
+  holder=new T.Group();rig=GO.build(holder,0);sc3.add(holder);autoFrame(false)}catch(e){console.error(e);log('モデル構築エラー: '+e.message)}}
+document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{U.mvg=b.dataset.m=='1';document.querySelectorAll('[data-m]').forEach(x=>x.classList.toggle('on',x==b))});
+$('#bat').onclick=()=>U.fa+=1;
+const cv=$('#cv');cv.onpointerdown=e=>{drag=e.clientX;cv.setPointerCapture(e.pointerId)};cv.onpointerup=()=>drag=null;cv.onpointermove=e=>{if(drag!=null){ry+=(e.clientX-drag)*.012;drag=null;drag=e.clientX}};
+let last=performance.now();
+(function loop(n){requestAnimationFrame(loop);const dt=Math.min(.05,(n-last)/1e3);last=n;
+ const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!=w*devicePixelRatio){rn.setPixelRatio(devicePixelRatio);rn.setSize(w,h,false);cam.aspect=w/h;cam.updateProjectionMatrix()}
+ if(holder&&rig){if(drag==null&&$('#ar').checked)ry+=dt*.5;holder.rotation.y=ry;applyCam();GO.tick(rig,U,dt)}rn.render(sc3,cam)})(last);
+
+/* ===== 撮影：プレビュー枠＝一覧アイコンの比率(1.8:1)。上半身を自動フレーミング＋ズーム/位置調整 ===== */
+const F={vf:2.2,cx:0,cy:1},AR=1.8;
+function autoFrame(reset){if(!holder)return;const r0=holder.rotation.y;holder.rotation.y=0;holder.updateMatrixWorld(true);
+ const bb=new T.Box3().setFromObject(holder);holder.rotation.y=r0;const hg=Math.max(.2,bb.max.y-bb.min.y);
+ F.vf=hg*.58;F.cy=bb.max.y+hg*.06-F.vf/2;F.cx=(.5-.36)*AR*F.vf;   /* 頭〜胸を写し、キャラは左寄り（一覧カードと同じ構図） */
+ if(reset){$('#zm').value=100;$('#px').value=0;$('#py').value=0}}
+function applyCam(){const vf=F.vf/($('#zm').value/100),cx=F.cx-$('#px').value/100*vf*AR*.5,cy=F.cy-$('#py').value/100*vf*.5,D=vf/(2*Math.tan(cam.fov/2*Math.PI/180));
+ cam.position.set(cx,cy,D);cam.lookAt(cx,cy,0)}
+$('#af').onclick=()=>autoFrame(true);
+$('#snap').onclick=()=>{let id=$('#slot').value;if(id===''||!S.chars){id=(prompt('キャラID（ch◯.png の◯）を入れてください')||'').trim();if(!id)return}
+ if(!holder){log('先にモデルを読み込んでください');return}
+ const W=720,H=Math.round(W/AR);fl.visible=false;cam.aspect=AR;cam.updateProjectionMatrix();rn.setPixelRatio(1);rn.setSize(W,H,false);applyCam();rn.render(sc3,cam);
+ const o=document.createElement('canvas');o.width=W;o.height=H;const g=o.getContext('2d');
+ if($('#bg').value=='blue'){const gr=g.createLinearGradient(0,0,0,H);gr.addColorStop(0,'#aee0fa');gr.addColorStop(1,'#7cc2ee');g.fillStyle=gr;g.fillRect(0,0,W,H)}
+ g.drawImage(rn.domElement,0,0);fl.visible=true;
+ o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='ch'+id+'.png';a.click();log('ch'+id+'.png を保存しました（'+W+'×'+H+'）。index.html と同じフォルダに置くと一覧アイコンになります')},'image/png')};
+
+/* ===== ゲームのindex.htmlを書き換える ===== */
+function patch(){
+ if(S.dirty&&S.geo&&S.anim&&S.png&&$('#slot').value!=='')register(true);   /* 編集中のモデルも自動で含める */
+ if(!S.models)throw Error('models.js が入っていません（ドロップするか、ゲームと同じフォルダで開いてください）');
+ const s=S.models,gi=s.indexOf(MK_GOD);if(gi<0)throw Error('models.js に GOD が見つかりません');const ge=s.indexOf('\n',gi);
+ const out={};for(const[id,v]of Object.entries(S.slots))out[id]={geo:v.geo,anim:v.anim,png:v.png,cfg:v.cfg};
+ return s.slice(0,gi)+MK_GOD+JSON.stringify(out)+';'+s.slice(ge)}
+$('#dl').onclick=()=>{try{const s=patch(),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/javascript'}));a.download='models.js';a.click();
+ for(const v of Object.values(S.slots))if(v.src=='new')v.src='out';renderSlots();updateDl();log('完成！ '+Object.keys(S.slots).length+'体ぶんを1つの models.js にまとめて保存しました（ゲームフォルダの models.js と置き換えてください。元のファイルはバックアップ推奨）')}catch(e){log('変換失敗: '+e.message)}};
+
+/* ===== 入力：ドロップ／タップ／ゲームの自動読み込み ===== */
+const dz=$('#drop');dz.onclick=()=>$('#fi').click();$('#fi').onchange=e=>ingest(e.target.files);
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('hot')};dz.ondragleave=()=>dz.classList.remove('hot');
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('hot');ingest(e.dataTransfer.files)};
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>{e.preventDefault();if(e.target!=dz)ingest(e.dataTransfer.files)});
+(async()=>{chips();
+ try{const r=await fetch('./script.js',{cache:'no-store'});if(r.ok){const t=await r.text();if(t.includes(MK_CH))setGame(t,'script.js（自動）')}}catch(e){}
+ try{const r=await fetch('./models.js',{cache:'no-store'});if(r.ok){const t=await r.text();if(t.includes(MK_GOD))setModels(t,'models.js（自動）')}}catch(e){}
+ if(!S.game)try{const j=JSON.parse(localStorage.getItem('bconv-game')||'null');if(j&&j.t.includes(MK_CH))setGame(j.t,j.name+'（前回）')}catch(e){}
+ if(!S.models)try{const j=JSON.parse(localStorage.getItem('bconv-models')||'null');if(j)setModels(j.t,j.name+'（前回）')}catch(e){}
+ refresh()})();
+</script></body></html>

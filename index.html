@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>ポケスタ</title>
+<link rel="manifest" href="manifest.json">
+<style>
+html{background:#140b24}
+html.wrap,html.wrap body{margin:0;height:100%;background:#140b24;overflow:hidden}
+html.wrap iframe{position:fixed;left:0;top:0;width:100%;height:100%;border:0;background:#140b24;z-index:1;pointer-events:none}
+html.wrap iframe.on{z-index:2;pointer-events:auto}
+html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;justify-content:center;background:rgba(20,11,36,.6);color:#fff;font:800 5vmin/1 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;pointer-events:auto}
+</style>
+<script>
+/* ★ index.html 1枚で「外枠」と「ゲーム本体」の両方をまかなう（以前の index.html + game.html を統合）
+   ・ふつうに開く → 外枠モード：マップごとに「自分自身(index.html)」を iframe で開いて切り替える
+   ・iframe の中 / ?nowrap=1 で開く → ゲームモード：ゲーム本体を読み込んで遊ぶ
+   ゲームモードで開いた時だけ style.css と各 .js を読み込むので、外枠モードは軽いまま。 */
+(function(){var fr=window.top!==window;
+ window.GF={fr:fr,wrap:!fr&&!/[?&]nowrap=1/.test(location.search)};
+ if(GF.wrap)document.documentElement.className='wrap';
+ if(fr){try{parent.postMessage('gf-ready','*')}catch(e){}}})();
+</script>
+</head>
+<body>
+<!-- ゲーム本体の画面部品（ゲームモードの時だけ下のスクリプトが body に差し込む） -->
+<script type="text/html" id="game-markup">
+<div id="app"><video id="hv" src="haike1.mp4" autoplay muted loop playsinline webkit-playsinline preload="auto" disablepictureinpicture></video><div id="cl" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="clb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b class="tx tt">キャラクター<em id="clc"></em></b><button class="tbb r" id="clh" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="cg"></div>
+</div>
+<div id="dt" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="dtb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button class="tbb r" id="dth" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="dl"><h2 id="dn" class="tx"></h2><div id="dr"><span></span></div><div id="dk"><div class="rk"><i><small>ランク</small><b></b></i></div><div class="trb tx"><span id="dkt"></span></div></div><p id="dd"></p>
+  <div id="dbt"><button class="dbn y tx" id="dsel">選択</button><button class="dbn b tx" id="dtry">試す</button></div></div>
+ <div id="drt"><button id="di" aria-label="説明">i</button>
+  <div class="sr a" id="sra"><div class="si">💥</div><div class="sx"><small>攻撃性</small><div class="sb"></div></div></div>
+  <div class="sr d" id="srd"><div class="si">💚</div><div class="sx"><small>防衛性</small><div class="sb"></div></div></div>
+  <div class="sr u" id="sru"><div class="si">🔧</div><div class="sx"><small>有用性</small><div class="sb"></div></div></div>
+  <div class="sr s"><div class="si">💀</div><div class="sx"><small>必殺技</small><b id="dsn"></b></div></div></div>
+ <div id="dp" hidden><div id="dpw"><div id="dpc"><div id="dph"><b>キャラクターステータス</b></div><div id="dpb"></div></div><button id="dx" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M5.5 6.7l13 13M18.5 6.7l-13 13" stroke="#8c1019" stroke-width="5.4" stroke-linecap="round"/><path d="M5.5 5l13 13M18.5 5l-13 13" stroke="#fff" stroke-width="5.4" stroke-linecap="round"/></svg></button></div></div>
+</div>
+<div id="home" class="ov">
+ <button id="hpf" aria-label="プロフィール"><span class="pfi"></span><span class="pfx"><b class="tx pfn"></b><small class="tx">プロフィール</small></span></button>
+ <button id="hc"><span id="hci"></span><b class="tx">キャラクター</b></button>
+ <button id="hmp" aria-label="マルチプレイ"><span id="hmpi">👥</span><b class="tx">マルチプレイ</b></button>
+ <div id="hm">
+  <svg class="gm" viewBox="0 0 64 64" aria-hidden="true">
+   <path class="sp" d="M9 3.5Q9 10 2.5 10Q9 10 9 16.5Q9 10 15.5 10Q9 10 9 3.5Z" fill="#fff"/>
+   <path class="sp" d="M24 0Q24 4.5 19.5 4.5Q24 4.5 24 9Q24 4.5 28.5 4.5Q24 4.5 24 0Z" fill="#dfe6ff"/>
+   <g stroke="#1b0a33" stroke-width="2" stroke-linejoin="round">
+    <path d="M38 14 16 27 38 39Z" fill="#a66bff"/>
+    <path d="M38 14 60 27 38 39Z" fill="#c9a0ff"/>
+    <path d="M60 27V52L38 39Z" fill="#7a35d8"/>
+    <path d="M60 52 38 64 38 39Z" fill="#5a1fb0"/>
+    <path d="M38 64 16 52 38 39Z" fill="#6a28c4"/>
+    <path d="M16 52V27L38 39Z" fill="#8a45e8"/>
+   </g>
+   <path d="M38 14 60 27V52L38 64 16 52V27Z" fill="none" stroke="#1b0a33" stroke-width="3.6" stroke-linejoin="round"/>
+   <path d="M38 19.5 51 27.2 38 34 28 28Z" fill="#f1dcff" opacity=".55"/>
+  </svg><span class="gi" aria-hidden="true"></span>
+  <span class="mi ko" id="hmko" aria-hidden="true"></span>
+  <div class="hmx"><b class="tx" id="hmn">エメラルドハント</b><small class="tx" id="hmm"></small></div>
+  <button id="hmi" aria-label="イベント情報">i</button>
+</div>
+ <button id="hp" class="tx">プレイ</button>
+</div>
+<div id="ms" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="msb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b class="tx tt">マップ</b><button class="tbb r" id="msh" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="msl"></div>
+ <div id="msn"></div>
+</div>
+<div id="pf" class="ov" hidden>
+ <div class="tb"><button class="tbb l" id="pfb" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b class="tx tt">プロフィール</b><button class="tbb r" id="pfh" aria-label="ホーム"><svg viewBox="0 0 24 24"><path d="M12 2.5 1.5 12h3.2v9.5h5.6v-6.2h3.4v6.2h5.6V12h3.2z" fill="#fff"/></svg></button></div>
+ <div id="pfl">
+  <div id="pfc"><div id="pfp"></div><div id="pfnm" class="tx"></div><button id="pfe" class="tx">名前を変更</button></div>
+  <div id="pfk"><b class="tx pfh">名前の色</b><div id="pfs"></div></div>
+ </div>
+ <div id="pfr"><b class="tx pfh">アイコンを選択</b><div id="pfg"></div></div>
+</div>
+<div id="pn" class="ov" hidden>
+ <div id="pnc"><b class="tx">名前を入力（10文字まで）</b><input id="pni" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><div id="pnb"><button id="pnx" class="tx">キャンセル</button><button id="pno" class="tx">OK</button></div></div>
+</div>
+<div id="mp" class="ov" hidden>
+ <div id="mpc">
+  <div id="mph"><span id="mpi"></span><div id="mpt"><b class="tx" id="mpa"></b><small class="tx" id="mpb"></small></div></div>
+  <div id="mpy"><div id="mpmw"><canvas id="mpm"></canvas></div><div id="mpr"><p id="mpd"></p><div id="mpl"></div></div></div>
+  <button id="mpx" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M5.5 6.7l13 13M18.5 6.7l-13 13" stroke="#fff" stroke-width="5.4" stroke-linecap="round"/></svg></button>
+ </div>
+</div>
+<div id="mr" class="ov" hidden>
+ <div class="mrbg"></div>
+ <button id="mrb" class="mrk" aria-label="戻る"><svg viewBox="0 0 24 24"><path d="M15.5 3 6 12l9.5 9" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+ <div id="mrs" class="tx"></div>
+ <button id="mri" aria-label="説明">i</button>
+ <button id="mrm" hidden aria-label="モード・マップ"><span class="mrmi"></span><span class="mrmt"><b class="tx"></b><small class="tx"></small></span><svg class="mrmc" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+ <div id="mrpn"><div id="mra" class="mrrow"></div><div id="mrb2" class="mrrow"></div></div>
+ <button id="mrg" class="tx" hidden>準備完了</button>
+ <div id="mrb3" class="tx" hidden></div>
+ <div id="mrw" hidden><i class="spin"></i><b id="mrwt" class="tx"></b></div>
+ <div id="mrh" hidden><div class="mrhc"><b class="tx">あそびかた</b><p>・「？」の枠(BOT)をタップ → そこへ移動</p><p>・人のいる枠をタップ → 場所を交代</p><p>・上がAチーム／下がBチーム。空いた枠はBOTが入ります</p><p>・オレンジの人(リーダー)が「開始」で試合スタート</p><p>・自分の枠をタップすると名前を変えられます</p></div></div>
+</div>
+<div id="mrt" class="tx"></div>
+<div id="hud" class="ov" hidden>
+ <div id="top"><div class="s"><div class="hx"><b id="gb">0</b></div><div class="bar" id="bb"></div></div><div id="clock">3:00</div><div class="s r"><div class="hx r"><b id="gr">0</b></div><div class="bar r" id="br"></div></div></div>
+ <div id="cdb"></div><div id="msg"></div><div id="zl"></div><div id="joy"><i></i></div>
+ <div id="sup" class="btn"><b style="font-size:32px">💀</b></div>
+ <div id="atk" class="btn"><b style="font-size:48px;opacity:.5">⌖</b><div id="ammo" hidden><i></i><i></i><i></i></div></div>
+</div>
+<div id="vs" class="ov" hidden><div id="vsr"><i class="vbn"></i><div class="vpr"></div></div><div id="vsb"><i class="vbn"></i><div class="vpr"></div></div><b id="vst">VS</b></div>
+<div id="bt" class="ov" hidden><b>BATTLE!!</b></div>
+<div id="end" class="ov" hidden><h1 id="et"></h1><div id="etr" class="tx"></div><div id="rp"></div><button id="endb" class="tx">終了</button></div></div>
+</script>
+<script>
+(function(){
+ var Q=location.search,BASE=location.pathname;   /* BASE = このファイル自身 */
+ /* スクリプトを「並行ダウンロード・順番どおり実行」で読み込む。最後のが終わったら done */
+ function load(list,done){
+  var els=list.map(function(u){var s=document.createElement('script');s.src=u;s.async=false;return s}),
+      last=els[els.length-1],fin=function(){if(fin.d)return;fin.d=1;if(done)done()};
+  last.onload=last.onerror=fin;
+  els.forEach(function(s){document.head.appendChild(s)})}
+
+ /* ===== ゲームモード（旧 game.html） ===== */
+ if(!GF.wrap){
+  (function(){var h=document.documentElement;['ui1','ui2','ui3','ui4','ui5','ui6','nocki','banner','banner2'].forEach(function(k){var i=new Image();i.onload=function(){h.classList.add('has-'+k)};i.src=k+'.png'})})();
+  var tpl=document.getElementById('game-markup'),html=tpl.textContent;tpl.parentNode.removeChild(tpl);
+  var started=0;
+  function start(){
+   if(started)return;started=1;
+   document.body.insertAdjacentHTML('afterbegin',html);
+   window.MPG={on:false};
+   load([
+   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+   'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js',
+   'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js',
+   'balance.js',
+   'models.js',
+   'vfx.js',
+   'maps.js',
+   'script.js',
+   'mapselect.js',
+   'profile.js',
+   'firebase-config.js',
+   'mp-net.js',
+   'mp-game.js',
+   'mp-ui.js'
+   ],function(){
+    /* 全スクリプトの実行が終わったことを外枠へ知らせる(先読み完了の合図) */
+    try{if(window.top!==window)parent.postMessage({gf:'loaded'},'*')}catch(e){}})}
+  var l=document.createElement('link');l.rel='stylesheet';l.href='style.css';
+  l.onload=l.onerror=start;document.head.appendChild(l);   /* CSS を先に読んでから部品とスクリプトを入れる(旧 game.html と同じ順番) */
+  return;
+ }
+
+ /* ===== 外枠モード（旧 index.html） ===== */
+ var cv=document.createElement('div');cv.id='cv';cv.textContent='読み込み中…';document.body.appendChild(cv);
+ function initWrap(){
+ var P=new URLSearchParams(Q),first=P.get('map');
+ var lim=P.get('preload');lim=lim===null?99:Math.max(0,parseInt(lim,10)||0);
+ var okId=function(s){return /^[\w-]+$/.test(s||'')};
+ if(!okId(first)){try{var st=localStorage.getItem('gemrush_map');first=okId(st)?st:'gem'}catch(e){first='gem'}}
+ P.delete('map');P.delete('bg');P.delete('preload');
+ var rest=P.toString(),F={},LD={},BG={},cur=first,ok=0,pend=null,fn=0;
+ /* 全マップの一覧(maps.js)。先読みの順番は「別モードのマップ → 同じモードの他のマップ」 */
+ var MP=[],MM={};
+ (window.MAPS||[]).forEach(function(m){if(m&&okId(m.id)){MP.push(m.id);MM[m.id]=m.mode}});
+ ['gem','ko'].forEach(function(k){if(MP.indexOf(k)<0){MP.push(k);MM[k]=k}});
+ if(MP.indexOf(first)<0){MP.push(first);MM[first]=first}
+ var ORDER=MP.filter(function(k){return k!==first}).sort(function(a,b){return (MM[a]===MM[first])-(MM[b]===MM[first])});
+ var loading=0,nT=0,mt0=null;   /* mt0=メニューBGMが鳴り始めた時刻(ms)。切替時に「何秒目か」を新しいマップへ渡して曲を続ける */
+ function url(m,bg){return BASE+'?map='+m+(bg?'&bg=1':'')+(rest?'&'+rest:'')}
+ function mk(m,bg){
+  if(F[m])return F[m];
+  var f=document.createElement('iframe');
+  f.setAttribute('allow','fullscreen; autoplay; screen-wake-lock');f.setAttribute('allowfullscreen','');
+  if(m===cur)f.className='on';
+  BG[m]=!!bg;loading++;f.src=url(m,bg);document.body.appendChild(f);F[m]=f;return f}
+ /* 先読み：いま読み込み中のものが無ければ、次のマップを1つだけ裏で作る(同時に何個も読んで重くならないように) */
+ function next(delay){
+  clearTimeout(nT);
+  nT=setTimeout(function(){
+   if(loading>0)return;
+   var n=0;for(var k in F)if(k!==first)n++;
+   if(n>=lim)return;
+   for(var i=0;i<ORDER.length;i++)if(!F[ORDER[i]]){mk(ORDER[i],1);return}
+  },delay)}
+ function post(m,d){try{F[m]&&F[m].contentWindow.postMessage(d,'*')}catch(e){}}
+ function show(m,sel,room){
+  var old=cur;cur=m;
+  for(var k in F)F[k].className=(k===m)?'on':'';
+  if(old!==m)post(old,{gf:'inactive'});
+  post(m,{gf:'active',sel:sel,room:room,bo:mt0==null?undefined:(performance.now()-mt0)/1000});
+  cv.style.display='none';
+  try{localStorage.setItem('gemrush_map',m)}catch(e){}}
+ function lock(){try{screen.orientation.lock('landscape').catch(function(){})}catch(e){}}
+ function fs(){
+  if(document.fullscreenElement||++fn>4)return;
+  try{var p=document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();
+   if(p&&p.then)p.then(lock,lock);else lock()}catch(e){}}
+ addEventListener('message',function(e){
+  var d=e.data;
+  if(d==='gf-ready'){ok=1;return}
+  if(!d||typeof d!=='object')return;
+  var m=null;for(var k in F)if(F[k].contentWindow===e.source)m=k;
+  if(!m)return;
+  ok=1;
+  if(d.gf==='loaded'){
+   if(!LD[m]){LD[m]=1;loading=Math.max(0,loading-1)}
+   if(pend&&pend.m===m){var p=pend;pend=null;show(m,p.sel,p.room)}
+   else if(m===cur&&BG[m])post(m,{gf:'active'});   /* 先読み用として作られたフレームが再読み込みされて、いま表示中の時は動かし直す */
+   next(m===first?1000:500);   /* 表示中のマップが終わったら1秒後から、先読みしたものが終わったら0.5秒後に次を先読み */
+  }else if(d.gf==='map'&&m===cur){
+   var t=okId(d.id)?d.id:null;
+   if(!t||t===cur)return;
+   if(LD[t])show(t,d.sel,d.room);
+   else{pend={m:t,sel:d.sel,room:d.room};mk(t,1);cv.style.display='flex'}   /* まだ先読みされていない時だけ「読み込み中」(全画面はそのまま) */
+  }else if(d.gf==='fs'&&m===cur)fs();
+  else if(d.gf==='bgm'&&m===cur){if(d.n==='menu'){if(mt0==null)mt0=performance.now()}else mt0=null}
+ });
+ var f0=mk(first,0);
+ /* 安全装置：iframe の読み込みが終わったのに ゲームから何の合図も来ない時(埋め込み禁止など)だけ、外枠なしに切り替える。
+    読み込みが遅いだけの時は待つ(以前は6秒で切り替えてしまい、それ以降のマップ切替が毎回「再読み込み＋全画面解除」になっていた) */
+ var fb=function(){if(!ok)location.replace(BASE+(Q?Q+'&':'?')+'nowrap=1')};
+ f0.addEventListener('load',function(){setTimeout(fb,3000)});
+ setTimeout(fb,40000);
+}
+ load(['maps.js'],initWrap);
+})();
+</script>
+</body></html>
