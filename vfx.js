@@ -7,8 +7,8 @@
 const VFX=(()=>{
 const T=THREE,rnd=Math.random,PI=Math.PI,TAU=PI*2;
 let gs=null,cam=null,light=null,lt=0,fr=0;
-const lowEnd=(navigator.hardwareConcurrency||8)<=4||Math.min(devicePixelRatio||1,2)>=3;
-const Q=lowEnd?.6:1,N=k=>Math.max(1,Math.round(k*Q));
+const GT=(window.GQ&&GQ.t!=null)?GQ.t:2,lowEnd=(navigator.hardwareConcurrency||8)<=4||Math.min(devicePixelRatio||1,2)>=3||GT==0;
+const Q=lowEnd?.6:GT==1?.8:1,N=k=>Math.max(1,Math.round(k*Q));
 const R=(a,b)=>a+rnd()*(b-a),H=c=>[(c>>16&255)/255,(c>>8&255)/255,(c&255)/255];
 const FLAME_W=.5;   /* ユニバードの炎の基準幅。攻撃範囲(エイム表示)の幅と同じ。炎の太さを変えたいときはこの数字だけ */
 
@@ -223,19 +223,25 @@ let SHM=null;function shieldMat(){return SHM||(SHM=new T.ShaderMaterial({uniform
  fragmentShader:`uniform float t;uniform vec3 c;varying vec3 vN;varying vec3 vV;varying vec2 vU;void main(){float f=pow(1.-abs(dot(normalize(vN),normalize(vV))),2.2);vec2 g=vU*vec2(46.,23.);vec2 h=abs(fract(g)-.5);float l=smoothstep(.42,.5,max(h.x*1.7,h.y*1.7+.0));float sc=smoothstep(.0,.25,fract(vU.y*2.-t*.6))*.35;gl_FragColor=vec4(c*(.35+f*1.6+l*.55+sc),.18+f*.75+l*.18);}`}))}
 
 /* ---------- ゾーン(オイル/炎/氷/時限爆弾) ---------- */
-const FL=new Set(['oil','fire','ice']);
+const FL=new Set(['fire','ice']);   /* oil(燃料)は script.js 側の青いオイルの水たまり(canvas絵)をそのまま見せる。粒子だけだと暗くて見えなかった */
 function zInit(o){const m=o.m;if(!m)return;
  m.children.forEach(c=>{const t=c.geometry&&c.geometry.type;if(!t)return;if(FL.has(o.k)&&(t=='CircleGeometry'||t=='RingGeometry'))c.visible=false;if(o.k=='pbomb'&&t=='CircleGeometry')c.visible=false});
  if(o.k=='ice'){const mt=new T.MeshStandardMaterial({color:0xbff4ff,emissive:0x4ac0ff,emissiveIntensity:.55,roughness:.15,metalness:.1,transparent:true,opacity:.82,flatShading:true});o.sk=[];
   for(let i=0,n=N(11);i<n;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*o.r*.92,h=R(.6,1.8)*(1-d/o.r*.5),s=new T.Mesh(new T.ConeGeometry(R(.12,.26),h,5),mt);s.position.set(Math.cos(a)*d,h/2,Math.sin(a)*d);s.rotation.set(R(-.25,.25),rnd()*TAU,R(-.25,.25));s.userData.h=h;m.add(s)}}
  if(o.k=='ice'){flash(o.x,o.z,0x7ad8ff,2.6);E(0,TILE.flare,o.x,.6,o.z,0,0,0,.3,1,o.r*1.2,0xffffff,0x7ad8ff,1,0,0,0,0,0,0,0);for(let i=0,n=N(16);i<n;i++){const a=rnd()*TAU,d=R(0,o.r);E(0,TILE.shard,o.x+Math.cos(a)*d,.3,o.z+Math.sin(a)*d,R(-2,2),R(2,6),R(-2,2),R(.6,1),.26,.06,0xffffff,0x7ad8ff,1,0,10,1,rnd()*TAU,R(-6,6),0,0)}}
- if(o.k=='oil')E(0,TILE.glow,o.x,.1,o.z,0,0,0,.4,o.r*.5,o.r*2.4,0x8a5aff,0x8a5aff,.5,0,0,0,0,0,0,2)}
+ if(o.k=='oil'){E(0,TILE.glow,o.x,.1,o.z,0,0,0,.4,o.r*.5,o.r*2.2,0x3a78ff,0x3a78ff,.4,0,0,0,0,0,0,2);ring(o.x,o.z,.2,o.r*1.1,.35,0x9fd4ff,.6);
+  for(let i=0,n=N(10);i<n;i++){const a=rnd()*TAU,s=R(1,3);E(0,TILE.dot,o.x,.2,o.z,Math.cos(a)*s,R(2,4),Math.sin(a)*s,R(.4,.7),.09,.03,0xcfe8ff,0x3a7cff,1,0,9,0,0,0,0,0)}}}
+/* ユニバードのウルト：燃料(青いオイル)を前方へ撒き散らす演出 */
+function oilSpray(u,a){const x=u.x,z=u.z,ca=Math.cos(a),sa=Math.sin(a);
+ for(let i=0,n=N(30);i<n;i++){const s=R(5,12),aa=a+R(-.26,.26);E(0,TILE.dot,x+ca*.5,R(.6,.95),z+sa*.5,Math.cos(aa)*s,R(1.2,3.2),Math.sin(aa)*s,R(.4,.75),.12,.04,0xbfe0ff,0x2a64ff,1,0,10,.3,0,0,0,0)}
+ E(0,TILE.flare,x+ca*.5,.8,z+sa*.5,0,0,0,.18,.6,1.4,0xffffff,0x6aa8ff,.7,0,0,0,0,0,0,0)}
 function zTick(q,dt){const k=q.k,x=q.x,z=q.z,r=q.r,L=dt*1.6,tm2=lt;
- if(k=='oil'){const f=Math.min(1,(q.t0-q.t)*5+.2)*Math.min(1,q.t*1.2),rr=r*f;
-  E(1,TILE.blot,x,.04,z,0,0,0,L,rr*2.1,rr*2.1,0x120a1c,0x120a1c,.92*f,0,0,0,q.x*7,0,0,2);
-  E(0,TILE.glow,x+Math.sin(tm2*.9+q.x)*rr*.25,.05,z+Math.cos(tm2*.7+q.z)*rr*.25,0,0,0,L,rr*1.5,rr*1.5,0x7a4aff,0x7a4aff,.22,0,0,0,0,0,0,2);
-  E(0,TILE.glow,x-rr*.28,.06,z-rr*.28,0,0,0,L,rr*.7,rr*.7,0xaaf0ff,0xaaf0ff,.3,0,0,0,0,0,0,2);
-  if(rnd()<dt*3)E(1,TILE.ring,x+R(-.6,.6)*rr,.07,z+R(-.6,.6)*rr,0,0,0,.6,.05,.3,0xc0a0ff,0xc0a0ff,.6,0,0,0,0,0,0,2)}
+ if(k=='oil'){const f=Math.min(1,(q.t0-q.t)*5+.2)*Math.min(1,q.t*1.2),rr=r*f,pu=.5+.5*Math.sin(tm2*3+q.x*2);
+  /* 燃料 = 青黒くてかるオイル。水面のさざ波と立ちのぼる気化ガス(うす青)で「燃えるもの」だと分かる。本体の絵は script.js(oilTex) */
+  E(0,TILE.glow,x,.05,z,0,0,0,L,rr*2.2,rr*2.2,0x3a78ff,0x3a78ff,(.1+.05*pu)*f,0,0,0,0,0,0,2);
+  if(rnd()<dt*3)E(1,TILE.ring,x+R(-.6,.6)*rr,.07,z+R(-.6,.6)*rr,0,0,0,.6,.05,.3,0x9fd4ff,0x9fd4ff,.35,0,0,0,0,0,0,2);
+  if(rnd()<dt*5)E(1,TILE.smoke,x+R(-.6,.6)*rr,.15,z+R(-.6,.6)*rr,0,R(.3,.7),0,1.4,.3,.9,0xa8d0ff,0xdcefff,.12*f,0,0,.6,rnd()*TAU,.4,0,0);
+  if(rnd()<dt*4)E(0,TILE.dot,x+R(-.7,.7)*rr,.15,z+R(-.7,.7)*rr,R(-.2,.2),R(.5,1.2),R(-.2,.2),R(.7,1.2),.06,.02,0xcfe8ff,0x4a90ff,1,-.5,.6,0,0,0,0,0)}
  else if(k=='fire'){const f=Math.min(1,q.t*1.2),rr=r;
   E(0,TILE.glow,x,.1,z,0,0,0,L,rr*2.6,rr*2.6,0xff5a10,0xff5a10,.4*f,0,0,0,0,0,0,2);E(0,TILE.glow,x,.1,z,0,0,0,L,rr*1.4,rr*1.4,0xffc050,0xffc050,.4*f,0,0,0,0,0,0,2);
   for(let i=0,n=N(3);i<n;i++)if(rnd()<dt*34/3){const a=rnd()*TAU,d=Math.sqrt(rnd())*rr*.85;E(0,TILE.flame,x+Math.cos(a)*d,.1,z+Math.sin(a)*d,R(-.3,.3),R(1.4,3),R(-.3,.3),R(.4,.75),.5*f+.1,.9*f+.1,0xffe08a,0xff3a06,.95,0,-1,1,R(-.3,.3),0,0,0)}
@@ -278,4 +284,4 @@ function update(dt){fr++;lt+=dt;if(!LA)return;LA.update(dt);LN.update(dt);if(SHM
  if(light){let i=light.userData.i||0;light.intensity=i*.45*(lowEnd?.7:1);light.userData.i=Math.max(0,i-dt*9)}}
 function init(scene,camera){gs=scene;cam=camera;const t=atlas();LA=new Layer(Math.round(2600*Q),true,t,31);LN=new Layer(Math.round(900*Q),false,t,30);gs.add(LN.mesh,LA.mesh);
  light=new T.PointLight(0xffa050,0,11,2);light.position.set(0,1.6,0);light.userData.i=0;gs.add(light)}
-return{init,update,reset,burst,sparks,flash,ring,muzzle,bInit,bTick,bHit,bEnd,explode,nova,charge,bolt,zapHit,leapStart,leapTick,buff,auraTick,shieldMat,zInit,zTick,dashStart,slash,slashHit,tfStart,tfTick,tfEnd,TILE}})();
+return{init,update,reset,burst,sparks,flash,ring,muzzle,bInit,bTick,bHit,bEnd,explode,nova,charge,bolt,zapHit,leapStart,leapTick,buff,auraTick,shieldMat,zInit,zTick,oilSpray,dashStart,slash,slashHit,tfStart,tfTick,tfEnd,TILE}})();

@@ -22,6 +22,8 @@ h2{margin:0 0 6px;font-size:14px;color:var(--ac)}
 .row small{color:var(--sub);display:block;font-size:11px}
 .row.tier{grid-template-columns:minmax(0,1fr) 180px 22px}
 .nrow{display:flex;gap:6px;align-items:center}.nrow span{color:var(--sub);font-size:12px;white-space:nowrap}
+.src{color:var(--sub);font-size:12px;margin:8px 0 0}.src b{color:var(--ac)}
+.row.pair{grid-template-columns:1fr 1fr 22px}
 .row.wide{grid-template-columns:1fr 22px}
 .row.wide input{grid-column:1/3;grid-row:2}
 input[type=number],input[type=text]{width:100%;background:#120f22;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:7px;font-size:14px}
@@ -42,15 +44,18 @@ details{background:var(--card);border-radius:12px;padding:10px;margin:10px 0}sum
   <button class="y" id="bDl">balance.js を書き出し</button>
   <button id="bCp">コピー</button>
   <button class="g" id="bLd">読み込み</button>
+  <button class="g" id="bSj">script.js 読込</button>
   <button class="g" id="bRc">このキャラを初期値に</button>
   <button class="r" id="bRa">全部初期値に</button>
   <input type="file" id="fi" accept=".js,.json,.txt" hidden>
+  <input type="file" id="fj" accept=".js,.txt" hidden>
  </div>
 </header>
 <div id="tabs"></div>
 <main>
  <details><summary>使い方</summary>
-  <p>1. キャラを選んで数値を編集（自動保存されます）<br>
+  <p>0. <b>キャラ一覧は同じフォルダの script.js から自動で読み込みます。</b>新キャラを追加したら、このページを開き直すだけでタブが増えます（セイリュウの変身・選択画面表示にも対応）。ファイルを直接開いて自動で読めない時は「script.js 読込」で script.js を選んでください。<br>
+  1. キャラを選んで数値を編集（自動保存されます）<br>
   2. 「balance.js を書き出し」を押してダウンロード<br>
   3. ゲームの <b>index.html と同じフォルダ</b>に balance.js を置いて上書き<br>
   4. ゲームを再読み込みすると反映されます<br>
@@ -59,22 +64,39 @@ details{background:var(--card);border-radius:12px;padding:10px;margin:10px 0}sum
   ※ <b>通常攻撃の連射間隔</b>：連打したときに次の弾が出るまでの秒数です(小さいほど速い)。リロード速度とは別で、弾が残っている間の撃つ速さを決めます。<br>
   ※ 移動速度・リロード速度・射程は5段階から選べます（下の数字欄で細かい微調整もできます）。移動速度は「マス/秒」表示で、書き出し時はゲーム内の値に自動変換されます。</p>
  </details>
+ <div id="src" class="src"></div>
  <div id="sum" class="sum"></div>
  <div id="body"></div>
  <details><summary>書き出しプレビュー（balance.js の中身）</summary><textarea id="out" readonly></textarea></details>
 </main>
 <div id="toast"></div>
 <script>
-const BASE=[{"id":0,"n":"エルゼ","role":"ブイブイ言わせてる","col":"#b46bff","ic":"🔮","hp":3800,"sp":3.9,"rl":1.3,"ch":0.012,"sf":"shot","ss":"big","su":"スーパースター","a":{"n":5,"spr":0.55,"d":340,"v":20,"rng":7},"s":{"n":9,"spr":0.95,"jit":0.03,"d":360,"v":22,"rng":7,"size":0.26,"star":1,"kb":3.4,"brk":0.3,"air":5.5},"da":"近距離で5発の散弾を放つ","ds":"障害物も敵も吹き飛ばす高威力。攻撃に耐えた敵も押し戻してしまう。"},{"id":1,"n":"スーリシャム","role":"砂漠の魔法使い","col":"#37a3ff","ic":"🤠","hp":3000,"sp":4.2,"rl":1.2,"ch":0.014,"sf":"pistol","ss":"pistol","su":"魔導バースト","a":{"sh":3,"gap":0.08,"jit":0.06,"d":300,"v":26,"rng":8.5},"s":{"sh":12,"gap":0.07,"jit":0.02,"d":340,"v":30,"rng":15,"size":0.22,"brk":0.3,"air":11},"da":"3連射の正確なショット","ds":"爆発的な衝撃とともに飛び出す魔法の弾は、障害物も粉砕するパワーと圧倒的な飛距離を誇る。"},{"id":2,"n":"ゴウエモン","role":"レッツコンボイ","col":"#ff8a2b","ic":"👊","hp":6200,"sp":3.5,"rl":1.4,"ch":0.006,"sc":1.3,"sf":"punch","ss":"boom","su":"ボディプレス","a":{"n":3,"spr":0.7,"d":650,"v":14,"rng":3.6,"size":0.5},"s":{"leap":1,"d":1500,"r":2.8,"rng":7,"air":7.5,"brk":2.3},"da":"短距離の強烈な衝撃波","ds":"壁を飛び越えてジャンプ。着地で範囲ダメージ＆吹き飛ばし。着地点の壁を破壊"},{"id":3,"n":"アカリリュウ","role":"双子の妹 あかりちゃん","col":"#14b8a6","ic":"👻","hp":2400,"sp":3.6,"rl":2,"ch":0.012,"bc":6750192,"sf":"laser","ss":"big","su":"ポピンズ","a":{"d":500,"v":17,"rng":10,"size":0.25,"ramp":2.1},"s":{"piper":1,"n":4,"T":0.34,"ah":1.4,"fuse":0.45,"d":900,"aoe":1.6,"kb":2,"brk":1.5,"rng":7.5,"air":3.6},"da":"遠くまで飛ぶほど威力が上がる狙撃弾（近いと約1/3、最大射程で最大ダメージ）","ds":"ドラッグで着地点を決めて素早くジャンプし、足元に4つの爆弾を落とす。空中では攻撃を受けない。爆弾は少し遅れて爆発し、敵を吹き飛ばして壁も壊す"},{"id":4,"n":"ユニバード","role":"ユニバーサルなやつ","col":"#ff6a2b","ic":"🔥","hp":3600,"sp":4,"rl":1.1,"ch":0.02,"bc":16752688,"sf":"flame","ss":"lob","su":"ファイアスターター","a":{"en":1,"gap":0.05,"jit":0.2,"d":60,"v":15,"rng":5.2,"size":0.26,"fl":1,"ed":0.85,"er":0.8,"ew":0.6},"s":{"oil":5,"st":1.1,"sp":0.95,"r":0.95,"t":12,"ft":4,"d":110,"rng":6,"air":6.5},"da":"ボタンを押している間、炎を噴射。燃料ゲージを消費し、離すと回復する","ds":"燃料のオイルを撒き散らす。攻撃の炎が触れると燃え上がり、炎の中の敵に継続ダメージ"},{"id":5,"n":"グレナーデ","role":"ボムボムボぽむあゆ","col":"#7fbf4a","ic":"💣","hp":3000,"sp":3.85,"rl":1.6,"ch":0.03125,"bc":3816008,"sf":"lob","ss":"boom","su":"ビッグバレル","a":{"n":2,"d":800,"v":8,"rng":7.33,"size":0.3,"lob":1,"aoe":1.15,"sep":0.8},"s":{"n":1,"d":2200,"v":5.9,"rng":7.33,"size":0.55,"lob":1,"aoe":2.27,"big":1,"nc":1,"kb":2.6,"brk":2.67},"da":"攻撃ボタンを引いて着弾距離を調整。2本のダイナマイトを壁越しに投げ、着地点で爆発","ds":"巨大な樽爆弾を投げる。範囲内の敵に大ダメージ＆吹き飛ばし。壁やブッシュも破壊"},{"id":6,"n":"エマ","role":"ちょっと待って！","col":"#e02a3a","ic":"🥷","hp":3200,"sp":4.1,"rl":1.9,"ch":0.0252,"bc":15265535,"sf":"star","ss":"poof","su":"煙玉","a":{"n":4,"sweep":1,"gap":0.055,"spr":0.24,"d":440,"v":17.5,"rng":9.67,"size":0.14,"blade":1,"fan":1,"ramp":-0.595},"s":{"buff":"stealth","t":6,"rng":6.5,"air":6.5,"na":1},"da":"4枚の手裏剣を扇状に、左から右へ順に投げる。近距離ほど全弾が当たり、遠いほどダメージが下がる","ds":"6秒間透明になる。攻撃すると姿が見える。近くの敵や被弾時にも見えてしまう"},{"id":7,"n":"アルタオーロ","role":"極光","col":"#7ad8ff","ic":"❄️","hp":3500,"sp":3.9,"rl":1.1,"ch":0.0285,"bc":11202815,"sf":"ice","ss":"freeze","su":"シロップ缶","a":{"sh":3,"gap":0.28,"d":440,"v":25,"rng":9.33,"size":0.2,"cone":1,"frost":0.1573},"s":{"lob":1,"can":1,"v":13,"d":40,"aoe":3.1,"r":3.5,"rng":7.67,"air":7,"t":10,"na":1},"da":"3連続でスノーコーンを投げる。当たるたびに凍結ゲージが溜まり、満タンで1.5秒間凍結","ds":"壁を越えて缶を投げ、10秒間残る滑る氷のエリアを作る。中の敵は滑って動きにくく、ゲージが溜まり、毎秒40ダメージ"},{"id":8,"n":"アルトマーレ","role":"回復のプロフェッショナル","col":"#ff7ab8","ic":"💉","hp":3200,"sp":4,"rl":1.2,"ch":0.02,"bc":16743096,"sf":"dart","ss":"big","su":"ナースコール","a":{"d":620,"v":20,"rng":8,"size":0.22,"heal":1},"s":{"nova":1,"r":4.6,"rng":4.6,"h":1800,"d":700,"rev":1,"na":1},"da":"敵にダメージ・味方を回復する弾","ds":"周囲の味方を大回復し、倒れた味方を全員蘇生"},{"id":9,"n":"ヴァルアフィ","role":"鉄爪","col":"#aab4d0","ic":"🛡️","hp":5400,"sp":3.6,"rl":1,"ch":0.012,"sc":1.12,"bc":13621503,"sf":"punch","ss":"guard","su":"強ダメージシールド","a":{"n":3,"spr":0.5,"d":460,"v":19,"rng":3.7,"size":0.42},"s":{"buff":"guard","t":3,"r":0,"rng":0,"air":7,"na":1},"da":"短距離に3連続パンチ","ds":"3秒間、自分が受けるダメージを70%減らす"},{"id":10,"n":"イヴクロース","role":"サンタだけどアイドルなんですぅ～","col":"#d0a020","ic":"🔫","hp":3600,"sp":3.9,"rl":1.4,"ch":0.0168,"sc":1.2,"bc":16054527,"sf":"lob","ss":"boom","su":"ショックウェーブ","a":{"d":1500,"v":6,"ac":[6,48,2.2],"rng":12.5,"size":0.36,"cloud":1},"s":{"nova":1,"wind":0.3,"sm":1,"nc":1,"r":3.7,"rng":3.7,"d":1240,"kb":4.6,"brk":2.2,"air":3.4,"hits":4,"na":1},"da":"遠くに飛ぶほど弾速が上がるロケットを放つ。最初はゆっくり、最後は一気に加速する","ds":"自分だけの空間を作りたいならこれで決まり。周囲の敵を一気に吹き飛ばす。"},{"id":11,"n":"ディザレッジ","role":"電撃ロボ","col":"#8ae6ff","ic":"⚡","hp":3000,"sp":4.1,"rl":1,"ch":0.014,"bc":9103103,"sf":"zap","ss":"bolt","su":"チェインライトニング","a":{"n":2,"spr":0.2,"d":520,"v":26,"rng":8.5,"pierce":1,"size":0.16},"s":{"chain":5,"d":900,"rng":9,"hop":5.2,"na":1,"air":9},"da":"貫通する電撃を2本発射","ds":"壁を無視する雷が最大5体に連鎖。感電で一瞬動きを止める"}];
-/* sch(必要ヒット数)が無ければ従来のch(ダメージ比例)から換算。ゲーム側と同じ式 */
-BASE.forEach(c=>{if(c.sch==null)c.sch=Math.max(1,Math.round(100/((c.a.d||300)*(c.ch||.01))))});
-const KEY='gr_bal_'+JSON.stringify(BASE).length;
-/* 通常攻撃の連射間隔(秒)の既定値。ゲーム側(script.js)の AD と同じ。※KEYの計算より後に足しているので、これまでの保存内容は消えません */
-const AD0={0:.65,1:.6,2:.7,3:.9,5:.8,6:.55,7:.65,8:.6,9:.7,10:.9,11:.55};
-BASE.forEach(c=>{if(c.ad==null)c.ad=AD0[c.id]||.6});
+/* ===== キャラデータ =====
+   起動時に同じフォルダの script.js から CH(キャラ一覧)を自動で読み込みます。新キャラを足したら開き直すだけで増えます。
+   読めない時(ファイルを直接開いた等)は「script.js 読込」で選ぶか、前回の読み込み結果／下の内蔵データを使います。 */
+const SNAP=[{"id":0,"n":"エルゼ","role":"ブイブイ言わせてる","col":"#b46bff","ic":"🔮","hp":3800,"sp":3.9,"rl":1.3,"ch":0.012,"sf":"elzeShot","ss":"elzeStar","su":"スーパースター","a":{"n":5,"spr":0.55,"d":340,"v":20,"rng":7},"s":{"n":9,"spr":0.95,"jit":0.03,"d":360,"v":22,"rng":7,"size":0.26,"star":1,"kb":3.4,"brk":0.3,"air":5.5},"da":"近距離で5発の散弾を放つ","ds":"障害物も敵も吹き飛ばす高威力。攻撃に耐えた敵も押し戻してしまう。"},{"id":1,"n":"スーリシャム","role":"砂漠の魔法使い","col":"#37a3ff","ic":"🤠","hp":3000,"sp":4.2,"rl":1.2,"ch":0.014,"sf":"magicBolt","ss":"magicBurst","su":"魔導バースト","a":{"sh":3,"gap":0.08,"jit":0.06,"d":300,"v":26,"rng":8.5},"s":{"sh":12,"gap":0.07,"jit":0.02,"d":340,"v":30,"rng":15,"size":0.22,"brk":0.3,"air":11},"da":"3連射の正確なショット","ds":"爆発的な衝撃とともに飛び出す魔法の弾は、障害物も粉砕するパワーと圧倒的な飛距離を誇る。"},{"id":2,"n":"ゴウエモン","role":"レッツコンボイ","col":"#ff8a2b","ic":"👊","hp":6200,"sp":3.5,"rl":1.4,"ch":0.006,"sc":1.3,"sf":"goeFist","ss":"goeSlam","su":"ボディプレス","a":{"n":3,"spr":0.7,"d":650,"v":14,"rng":3.6,"size":0.5},"s":{"leap":1,"d":1500,"r":2.8,"rng":7,"air":7.5,"brk":2.3},"da":"短距離の強烈な衝撃波","ds":"壁を飛び越えてジャンプ。着地で範囲ダメージ＆吹き飛ばし。着地点の壁を破壊"},{"id":3,"n":"アカリリュウ","role":"双子の妹 あかりちゃん","col":"#14b8a6","ic":"👻","hp":2400,"sp":3.6,"rl":2,"ch":0.012,"bc":6750192,"sf":"akariSnipe","ss":"poppins","su":"ポピンズ","a":{"d":500,"v":17,"rng":10,"size":0.25,"ramp":2.1},"s":{"piper":1,"n":4,"T":0.34,"ah":1.4,"fuse":0.45,"d":900,"aoe":1.6,"kb":2,"brk":1.5,"rng":7.5,"air":3.6},"da":"遠くまで飛ぶほど威力が上がる狙撃弾（近いと約1/3、最大射程で最大ダメージ）","ds":"ドラッグで着地点を決めて素早くジャンプし、足元に4つの爆弾を落とす。空中では攻撃を受けない。爆弾は少し遅れて爆発し、敵を吹き飛ばして壁も壊す"},{"id":4,"n":"ユニバード","role":"ユニバーサルなやつ","col":"#ff6a2b","ic":"🔥","hp":3600,"sp":4,"rl":1.1,"ch":0.02,"bc":16752688,"sf":"flameJet","ss":"oilSpill","su":"ファイアスターター","a":{"en":1,"gap":0.05,"jit":0.2,"d":60,"v":15,"rng":5.2,"size":0.26,"fl":1,"ed":0.85,"er":0.8,"ew":0.6},"s":{"oil":5,"st":1.1,"sp":0.95,"r":0.95,"t":12,"ft":4,"d":110,"rng":6,"air":6.5},"da":"ボタンを押している間、炎を噴射。燃料ゲージを消費し、離すと回復する","ds":"前方に燃料(青くてかるオイルの水たまり)を撒く。通常攻撃の炎を燃料に当てると全部に着火して燃え上がり、炎の中の敵に継続ダメージ。触れたブッシュも焼き払い、隣のブッシュへ燃え移る"},{"id":5,"n":"グレナーデ","role":"ボムボムボぽむあゆ","col":"#7fbf4a","ic":"💣","hp":3000,"sp":3.85,"rl":1.6,"ch":0.03125,"bc":3816008,"sf":"dynaThrow","ss":"barrelThrow","su":"ビッグバレル","a":{"n":2,"d":800,"v":8,"rng":7.33,"size":0.3,"lob":1,"aoe":1.15,"sep":0.8},"s":{"n":1,"d":2200,"v":5.9,"rng":7.33,"size":0.55,"lob":1,"aoe":2.27,"big":1,"nc":1,"kb":2.6,"brk":2.67},"da":"攻撃ボタンを引いて着弾距離を調整。2本のダイナマイトを壁越しに投げ、着地点で爆発","ds":"巨大な樽爆弾を投げる。範囲内の敵に大ダメージ＆吹き飛ばし。壁やブッシュも破壊"},{"id":6,"n":"エマ","role":"ちょっと待って！","col":"#e02a3a","ic":"🥷","hp":3200,"sp":4.1,"rl":1.9,"ch":0.0252,"bc":15265535,"sf":"shuriken","ss":"smokeBomb","su":"煙玉","a":{"n":4,"sweep":1,"gap":0.055,"spr":0.24,"d":440,"v":17.5,"rng":9.67,"size":0.14,"blade":1,"fan":1,"ramp":-0.595},"s":{"buff":"stealth","t":6,"rng":6.5,"air":6.5,"na":1},"da":"4枚の手裏剣を扇状に、左から右へ順に投げる。近距離ほど全弾が当たり、遠いほどダメージが下がる","ds":"6秒間透明になる。攻撃すると姿が見える。近くの敵や被弾時にも見えてしまう"},{"id":7,"n":"アルタオーロ","role":"極光","col":"#7ad8ff","ic":"❄️","hp":3500,"sp":3.9,"rl":1.1,"ch":0.0285,"bc":11202815,"sf":"iceCone","ss":"syrupCan","su":"シロップ缶","a":{"sh":3,"gap":0.28,"d":440,"v":25,"rng":9.33,"size":0.2,"cone":1,"frost":0.1573},"s":{"lob":1,"can":1,"v":13,"d":40,"aoe":3.1,"r":3.5,"rng":7.67,"air":7,"t":10,"na":1},"da":"3連続でスノーコーンを投げる。当たるたびに凍結ゲージが溜まり、満タンで1.5秒間凍結","ds":"壁を越えて缶を投げ、10秒間残る滑る氷のエリアを作る。中の敵は滑って動きにくく、ゲージが溜まり、毎秒40ダメージ"},{"id":8,"n":"アルトマーレ","role":"回復のプロフェッショナル","col":"#ff7ab8","ic":"💉","hp":3200,"sp":4,"rl":1.2,"ch":0.02,"bc":16743096,"sf":"nurseDart","ss":"nurseCall","su":"ナースコール","a":{"d":620,"v":20,"rng":8,"size":0.22,"heal":1},"s":{"nova":1,"r":4.6,"rng":4.6,"h":1800,"d":700,"rev":1,"na":1},"da":"敵にダメージ・味方を回復する弾","ds":"周囲の味方を大回復し、倒れた味方を全員蘇生"},{"id":9,"n":"ヴァルアフィ","role":"鉄爪","col":"#aab4d0","ic":"🛡️","hp":5400,"sp":3.6,"rl":1,"ch":0.012,"sc":1.12,"bc":13621503,"sf":"ironFist","ss":"ironGuard","su":"強ダメージシールド","a":{"n":3,"spr":0.5,"d":460,"v":19,"rng":3.7,"size":0.42},"s":{"buff":"guard","t":3,"r":0,"rng":0,"air":7,"na":1},"da":"短距離に3連続パンチ","ds":"3秒間、自分が受けるダメージを70%減らす"},{"id":10,"n":"イヴクロース","role":"サンタだけどアイドルなんですぅ～","col":"#d0a020","ic":"🔫","hp":3600,"sp":3.9,"rl":1.4,"ch":0.0168,"sc":1.2,"bc":16054527,"sf":"rocket","ss":"shockwave","su":"ショックウェーブ","a":{"d":1500,"v":6,"ac":[6,48,2.2],"rng":12.5,"size":0.36,"cloud":1},"s":{"nova":1,"wind":0.3,"sm":1,"nc":1,"r":3.7,"rng":3.7,"d":1240,"kb":4.6,"brk":2.2,"air":3.4,"hits":4,"na":1},"da":"遠くに飛ぶほど弾速が上がるロケットを放つ。最初はゆっくり、最後は一気に加速する","ds":"自分だけの空間を作りたいならこれで決まり。周囲の敵を一気に吹き飛ばす。"},{"id":11,"n":"ディザレッジ","role":"電撃ロボ","col":"#8ae6ff","ic":"⚡","hp":3000,"sp":4.1,"rl":1,"ch":0.014,"bc":9103103,"sf":"arcZap","ss":"lightning","su":"チェインライトニング","a":{"n":2,"spr":0.2,"d":520,"v":26,"rng":8.5,"pierce":1,"size":0.16},"s":{"chain":5,"d":900,"rng":9,"hop":5.2,"na":1,"air":9},"da":"貫通する電撃を2本発射","ds":"壁を無視する雷が最大5体に連鎖。感電で一瞬動きを止める"},{"id":12,"n":"セイリュウ","role":"変身ヒロイン","col":"#ffd45a","ic":"🌟","hp":5920,"sp":4.556,"rl":1.6,"ch":0.02,"sch":10,"bc":16769658,"sf":"nova","ss":"novaForm","su":"ノヴァチェンジ","a":{"n":2,"pair":0.34,"spr":0,"jit":0,"d":768,"v":21,"rng":5.67,"size":0.3,"pierce":1,"star":1},"s":{"tf":1,"d":480,"dv":17,"rng":4.33,"w":2,"t":7},"tf":{"t":7,"d":1760,"heal":0.3,"spd":1.25,"reach":3.4,"arc":130,"form":"12t"},"stA":[["弾丸ごとのダメージ","768"],["射程","普通 5.67マス"],["リロード速度","普通 1.6秒"],["弾数","3"],["DPS","480"]],"stS":[["ダッシュダメージ","480"],["剣ダメージ","1760"],["ダメージ回復","30%"],["効果時間","7秒"],["移動速度","+25%"],["射程","普通 4.33マス"],["必殺技チャージに必要なヒット数","10"]],"da":"髪から貫通する大きなキラキラ弾を2発放つ","ds":"ダッシュしたのちにアルティメットフォームへ変身し、ノヴァソードを召喚！移動速度が上昇し、与えたダメージの30%分HPを回復する。通常攻撃は剣の形に変化する。変身時間は7秒。"}];
+const SNAP_AD={"0":0.65,"1":0.6,"2":0.7,"3":0.9,"5":0.8,"6":0.55,"7":0.65,"8":0.6,"9":0.7,"10":0.9,"11":0.55,"12":0.65};
 const cl=x=>JSON.parse(JSON.stringify(x)),eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-let E=cl(BASE),cur=0;
-try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.length==E.length){E=s;E.forEach((c,i)=>{if(c.sch==null)c.sch=BASE[i].sch;if(c.ad==null)c.ad=BASE[i].ad})}}catch(e){}
+let BASE=[],E=[],cur=0,SRC='';
+const DK='gr_bal2',CK='gr_base_cache';
+/* sch(必要ヒット数)・ad(連射間隔)が無ければゲーム側(script.js)と同じ規則で補う */
+const prep=(chars,AD,df)=>chars.map(x=>{const c=cl(x);c.a=c.a||{};c.s=c.s||{};if(c.sch==null)c.sch=Math.max(1,Math.round(100/((c.a.d||300)*(c.ch||.01))));if(c.ad==null)c.ad=(AD&&AD[c.id])||df||.6;return c});
+function parseGame(t){const s=t.indexOf('const CH=['),e=t.indexOf('if(window.BALANCE)',s);if(s<0||e<0)throw new Error('CHが見つかりません');
+ const chars=new Function(t.slice(s,e)+'\nreturn CH;')();let AD={},df=.6;
+ const m=t.match(/const AD=(\{[^}]*\})/);if(m)try{AD=new Function('return '+m[1])()}catch(_){}
+ const d=t.match(/AD\[c\.id\]\|\|([\d.]+)/);if(d)df=parseFloat(d[1]);
+ return{chars,AD,df}}
+const diffOf=(c,b)=>{const d={};for(const k in c)if(!eq(c[k],b[k]))d[k]=c[k];return d};
+const collect=()=>{const m={};E.forEach((c,i)=>{const d=diffOf(c,BASE[i]);if(Object.keys(d).length)m[c.id]=d});return m};
+function setBase(g,src,save,edits){
+ const m=edits||collect(),id=E[cur]&&E[cur].id;
+ BASE=prep(g.chars,g.AD,g.df);SRC=src;
+ if(save)try{localStorage.setItem(CK,JSON.stringify(g))}catch(_){}
+ E=BASE.map(b=>{const c=cl(b),d=m[b.id];if(d)Object.assign(c,cl(d));return c});
+ cur=Math.max(0,E.findIndex(x=>x.id==id))}
+/* 旧バージョンのエディターの自動保存(gr_bal_数字)を、キャラIDごとの差分に変換して引き継ぐ */
+function oldEdits(B){let best=null,bn=-1;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i),m=/^gr_bal_(\d+)$/.exec(k);if(m&&+m[1]>bn){bn=+m[1];best=k}}
+ if(!best)return{};const o={};JSON.parse(localStorage.getItem(best)).forEach(c=>{const b=B.find(x=>x.id==c.id);if(!b)return;const d={};for(const k in c)if(!['sf','ss','ds'].includes(k)&&!eq(c[k],b[k]))d[k]=c[k];if(Object.keys(d).length)o[c.id]=d});return o}catch(_){return{}}}
 
 /* 項目の定義: [表示名, 型(n数値/f オンオフ/t 文字/c 色/cn 色(数値)/arr 配列), step, 説明, 追加時の初期値] */
 const C={
@@ -123,8 +145,14 @@ const P={
  leap:['ジャンプ攻撃','f'],rev:['蘇生','f'],gh:['壁を貫通','f'],sweep:['順番に投げる','f'],
  cone:['コーン弾','f'],cloud:['雲弾','f'],blade:['刃弾','f'],star:['星弾','f'],fan:['扇状照準','f'],
  en:['噴射式(燃料)','f'],fl:['炎','f'],slow:['減速','f'],na:['照準線なし','f'],nc:['チャージしない','f'],
- sm:['強ノックバック','f'],piper:['ジャンプ爆弾','f']
+ sm:['強ノックバック','f'],piper:['ジャンプ爆弾','f'],
+ pair:['2発の左右の間隔','n',.01,'2発を横に並べて撃つ幅'],tf:['変身技(ダッシュ→変身)','f'],w:['ダッシュの幅','n',.1,'ダッシュで当たる太さ']
 };
+/* 変身(tf)セクションの項目 */
+const TFD={t:['変身時間(秒)','n',.5,'',7],d:['剣のダメージ','n',10],heal:['ダメージ回復率','n',.05,'0.3＝与えたダメージの30%回復'],spd:['移動速度の倍率','n',.05,'1.25＝+25%'],reach:['剣の射程(マス)','n',.1],arc:['剣の角度(度)','n',5,'扇形の広さ'],form:['変身後モデルID','t',0,'converter.html のスロットID']};
+const SD={tf:TFD};
+const SEC={tf:'変身（tf）',stA:'キャラ選択画面の表示：通常攻撃（stA）',stS:'キャラ選択画面の表示：必殺技（stS）'};
+const SKIP=['id','ch','a','s','n','role','su','da','ds','col','bc','ic','sf','ss'];
 const TXT={n:['名前','t'],role:['肩書き','t'],su:['必殺技名','t'],da:['通常攻撃の説明','t'],ds:['必殺技の説明','t'],col:['キャラ色','c'],bc:['弾の色','cn']};
 const ALWAYS_C=['hp','sp','rl','ad','sch','sc','dr','hr','wr'],ALWAYS_P=['d','n','sh','rng','v','size','hr'];
 const REQ=['hp','sp','rl','ad','sch','d','rng'];
@@ -165,11 +193,12 @@ function tierRow(o,k,lb,hint){
 function row(o,k,def,{always,rm}={}){
  const [lb,ty,st,hint]=def||[k,'n',.01];
  const TK={tS:'sp',tR:'rl',tG:'rng'};if(TK[ty])return tierRow(o,TK[ty],lb,hint);
- const r=mk('div',{className:'row'+(ty=='t'?' wide':'')},`<div>${lb}<small>${k}${hint?' ・ '+hint:''}</small></div>`);
+ const r=mk('div',{className:'row'+(ty=='t'||ty=='j'?' wide':'')},`<div>${lb}<small>${k}${hint?' ・ '+hint:''}</small></div>`);
  let i;
  if(ty=='f'){i=mk('input',{type:'checkbox',checked:!!o[k]});i.onchange=()=>{o[k]=i.checked?1:0;upd()}}
  else if(ty=='c'||ty=='cn'){i=mk('input',{type:'color',value:ty=='c'?(o[k]||'#ffffff'):hex(o[k]||0xffffff)});i.oninput=()=>{o[k]=ty=='c'?i.value:parseInt(i.value.slice(1),16);upd()}}
  else if(ty=='t'){i=mk('input',{type:'text',value:o[k]??''});i.oninput=()=>{o[k]=i.value;upd()}}
+ else if(ty=='j'){i=mk('input',{type:'text',value:JSON.stringify(o[k]??null)});i.onchange=()=>{try{o[k]=JSON.parse(i.value);upd()}catch(e){toast('JSONの形式が正しくありません');i.value=JSON.stringify(o[k]??null)}}}
  else if(ty=='arr'){i=mk('input',{type:'text',value:(o[k]||[]).join(',')});i.onchange=()=>{const a=i.value.split(',').map(parseFloat).filter(x=>!isNaN(x));if(a.length)o[k]=a;else delete o[k];upd()}}
  else{i=mk('input',{type:'number',step:'any',value:o[k]??'',placeholder:PH[k]||''});
   i.oninput=()=>{if(i.value===''){if(!REQ.includes(k)){delete o[k];upd()}return}const v=parseFloat(i.value);if(!isNaN(v)){o[k]=v;upd()}}}
@@ -186,54 +215,77 @@ function addBox(o,defs,skip,sec){
  s.onchange=()=>{const k=s.value;if(!k)return;const d=defs[k];o[k]=d[1]=='f'?1:d[1]=='arr'?[1,1,1]:d[1]=='t'?'':d[4]??1;render()};
  b.append(s);return b}
 
-function sect(title,o,defs,always,skip){
- const s=mk('section',{},`<h2>${title}</h2>`);
- const keys=[...always,...Object.keys(o).filter(k=>!always.includes(k)&&!skip.includes(k)&&defs[k])];
- const unk=Object.keys(o).filter(k=>!always.includes(k)&&!skip.includes(k)&&!defs[k]);
- keys.forEach(k=>s.append(row(o,k,defs[k],{rm:defs==P?!['d','rng'].includes(k)&&k in o:(!(k in BASE[cur])&&k in o)})));
- unk.forEach(k=>{if(typeof o[k]=='number')s.append(row(o,k,[k,'n',.01],{rm:defs==P}))});
+/* エディターに項目定義が無い(新しく増えた)項目も、値の型から自動で入力欄を作る */
+const gdef=(k,v)=>typeof v=='number'?[k,'n',.01,'未登録の項目']:typeof v=='string'?[k,'t',0,'未登録の項目']:typeof v=='boolean'?[k,'f',0,'未登録の項目']:Array.isArray(v)&&v.length&&v.every(x=>typeof x=='number')?[k,'arr',0,'未登録の項目']:[k,'j',0,'未登録の項目（JSON形式）'];
+const isPairs=v=>Array.isArray(v)&&v.length>0&&v.every(x=>Array.isArray(x)&&x.length==2&&x.every(y=>typeof y=='string'));
+function sect(title,o,defs,always,skip,ref){
+ const s=mk('section',{},`<h2>${title}</h2>`),rest=Object.keys(o).filter(k=>!always.includes(k)&&!skip.includes(k));
+ const rm=k=>defs==P?!['d','rng'].includes(k):!(ref&&k in ref);
+ [...always,...rest.filter(k=>defs[k]),...rest.filter(k=>!defs[k])].forEach(k=>s.append(row(o,k,defs[k]||gdef(k,o[k]),{rm:k in o&&rm(k)})));
  s.append(addBox(o,defs,[...skip,...always]));return s}
+function pairSect(o,k){
+ const s=mk('section',{},`<h2>${SEC[k]||k+'（追加項目）'}</h2>`);
+ s.append(mk('div',{className:'sum'},'キャラ選択画面にそのまま出る文字です。数値を変えても自動では変わらないので、必要ならここも直してください。'));
+ o[k].forEach((p,i)=>{const r=mk('div',{className:'row pair'}),a=mk('input',{type:'text',value:p[0]}),b=mk('input',{type:'text',value:p[1]}),x=mk('button',{className:'x',title:'この行を削除'},'✕');
+  a.oninput=()=>{p[0]=a.value;upd()};b.oninput=()=>{p[1]=b.value;upd()};x.onclick=()=>{o[k].splice(i,1);render();upd()};r.append(a,b,x);s.append(r)});
+ const ad=mk('button',{className:'g'},'＋ 行を追加');ad.onclick=()=>{o[k].push(['項目名','値']);render();upd()};s.append(ad);return s}
 
+const tn=(k,v)=>v==null?{name:'未設定',d:'-'}:tierOf(k,v);
 function summary(c){
  const f=o=>{const n=(o.n||1)*(o.sh||1);return o.en?`${o.d} 連続噴射`:`${o.d||0} × ${n} = <b>${(o.d||0)*n}</b>`};
  const a=c.a,s=c.s,dps=a.en?a.d/a.gap*.5:(a.d||0)*(a.n||1)*(a.sh||1)/c.rl;
- $('#sum').innerHTML=`<b>${c.ic} ${c.n}</b>　HP <b>${c.hp}</b> ／ 必殺チャージ <b>${c.sch}ヒット</b> ／ 移動 <b>${tierOf('sp',c.sp).name}</b>(${tierOf('sp',c.sp).d} マス/秒) ／ リロード <b>${tierOf('rl',c.rl).name}</b>(${tierOf('rl',c.rl).d} s) ／ 連射間隔 <b>${c.ad}s</b>(約${(1/Math.max(.05,c.ad)).toFixed(1)}発/秒)<br>通常攻撃：${f(a)}　(射程 <b>${tierOf('rng',a.rng).name}</b> ${a.rng} マス・弾の速度 ${a.v??'-'} マス/秒・DPS約<b>${Math.round(dps)}</b>)<br>必殺技（${c.su}）：${s.d?f(s):'ダメージなし'}　(射程${s.rng??'-'})<br>当たり判定：被弾 <b>${c.hr??0.4}</b> ／ 通常弾 <b>${a.hr??((a.size||.2)+.15).toFixed(2)}</b> ／ 必殺弾 <b>${s.hr??((s.size||.2)+.15).toFixed(2)}</b>`}
+ $('#sum').innerHTML=`<b>${c.ic} ${c.n}</b>　HP <b>${c.hp}</b> ／ 必殺チャージ <b>${c.sch}ヒット</b> ／ 移動 <b>${tn('sp',c.sp).name}</b>(${tn('sp',c.sp).d} マス/秒) ／ リロード <b>${tn('rl',c.rl).name}</b>(${tn('rl',c.rl).d} s) ／ 連射間隔 <b>${c.ad}s</b>(約${(1/Math.max(.05,c.ad)).toFixed(1)}発/秒)<br>${c.tf?`変身中：剣 <b>${c.tf.d}</b> ／ 射程 ${c.tf.reach} ／ ${c.tf.t}秒 ／ 移動×${c.tf.spd} ／ 回復${Math.round((c.tf.heal||0)*100)}%<br>`:''}通常攻撃：${f(a)}　(射程 <b>${tn('rng',a.rng).name}</b> ${a.rng} マス・弾の速度 ${a.v??'-'} マス/秒・DPS約<b>${Math.round(dps)}</b>)<br>必殺技（${c.su}）：${s.d?f(s):'ダメージなし'}　(射程${s.rng??'-'})<br>当たり判定：被弾 <b>${c.hr??0.4}</b> ／ 通常弾 <b>${a.hr??((a.size||.2)+.15).toFixed(2)}</b> ／ 必殺弾 <b>${s.hr??((s.size||.2)+.15).toFixed(2)}</b>`}
 
 function render(){
- const c=E[cur];
+ const c=E[cur],B=$('#body');
+ $('#src').innerHTML=`キャラデータ：<b>${SRC}</b>（${E.length}体）`;
  $('#tabs').innerHTML='';
- E.forEach((x,i)=>{const b=mk('button',{className:(i==cur?'on ':'')+(eq(x,BASE[i])?'':'mod')},`${x.ic} ${x.n}`);b.onclick=()=>{cur=i;render()};$('#tabs').append(b)});
- const B=$('#body');B.innerHTML='';
- B.append(sect('基本ステータス',c,C,ALWAYS_C,['id','ch','a','s','n','role','su','da','ds','col','bc','ic','sf','ss']));
- B.append(sect('通常攻撃（a）',c.a,P,ALWAYS_P,[]));
- B.append(sect('必殺技（s）',c.s,P,ALWAYS_P,[]));
+ E.forEach((x,i)=>{const b=mk('button',{className:(i==cur?'on ':'')+(eq(x,BASE[i])?'':'mod')},`${x.ic||'❓'} ${x.n||'id'+x.id}`);b.onclick=()=>{cur=i;render()};$('#tabs').append(b)});
+ B.innerHTML='';
+ const ks=Object.keys(c).filter(k=>!SKIP.includes(k)),pr=ks.filter(k=>isPairs(c[k])),ob=ks.filter(k=>c[k]&&typeof c[k]=='object'&&!Array.isArray(c[k]));
+ B.append(sect('基本ステータス',c,C,ALWAYS_C,[...SKIP,...pr,...ob],BASE[cur]));
+ B.append(sect('通常攻撃（a）',c.a,P,ALWAYS_P,[],BASE[cur].a));
+ B.append(sect('必殺技（s）',c.s,P,ALWAYS_P,[],BASE[cur].s));
+ ob.forEach(k=>B.append(sect(SEC[k]||k+'（追加項目）',c[k],SD[k]||{},[],[],BASE[cur][k])));
+ pr.forEach(k=>B.append(pairSect(c,k)));
  const t=mk('section',{},'<h2>名前・説明・色</h2>');
  Object.keys(TXT).forEach(k=>{if(k=='bc'&&!(k in c))return;t.append(row(c,k,TXT[k]))});
  B.append(t);upd(1)}
 
+const qk=k=>/^(?:[A-Za-z_$][\w$]*|\d+)$/.test(k)?k:JSON.stringify(k);
 function ser(v,k){
  if(typeof v=='number')return k=='bc'?'0x'+v.toString(16).padStart(6,'0'):String(v);
  if(typeof v=='string')return JSON.stringify(v);
  if(Array.isArray(v))return '['+v.map(x=>ser(x)).join(',')+']';
- return '{'+Object.keys(v).map(q=>q+':'+ser(v[q],q)).join(',')+'}'}
+ return '{'+Object.keys(v).map(q=>qk(q)+':'+ser(v[q],q)).join(',')+'}'}
 function build(){
  const L=[];
  E.forEach((c,i)=>{const b=BASE[i],d={};for(const k in c)if(!eq(c[k],b[k]))d[k]=c[k];
-  if(Object.keys(d).length)L.push(` /* ${c.n} */ ${c.id}:${ser(d)}`)});
+  if(Object.keys(d).length)L.push(` /* ${c.n} */ ${qk(c.id)}:${ser(d)}`)});
  return `/* ジェムラッシュ バランス設定 (editor.html で生成) */\nwindow.BALANCE={\n${L.join(',\n')}\n};\n`}
 
 function upd(skipSave){
  summary(E[cur]);$('#out').value=build();
- if(!skipSave)try{localStorage.setItem(KEY,JSON.stringify(E))}catch(e){}
+ if(!skipSave)try{localStorage.setItem(DK,JSON.stringify(collect()))}catch(e){}
  [...$('#tabs').children].forEach((b,i)=>b.classList.toggle('mod',!eq(E[i],BASE[i])))}
 
 $('#bDl').onclick=()=>{const a=mk('a',{href:URL.createObjectURL(new Blob([build()],{type:'text/javascript'})),download:'balance.js'});document.body.append(a);a.click();a.remove();toast('balance.js を書き出しました')};
 $('#bCp').onclick=async()=>{try{await navigator.clipboard.writeText(build())}catch(e){$('#out').select();document.execCommand('copy')}toast('コピーしました')};
 $('#bLd').onclick=()=>$('#fi').click();
+const loadGame=(t,name)=>{setBase(parseGame(t),'script.js（手動: '+name+'）',true);render();upd();toast('キャラ '+E.length+'体を読み込みました')};
 $('#fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();let B;
- try{try{B=JSON.parse(t)}catch(_){const w={};new Function('window',t)(w);B=w.BALANCE}
-  for(const id in B){const c=E.find(x=>x.id==id);if(c)Object.assign(c,cl(B[id]))}toast('読み込みました');render();upd()}catch(err){toast('読み込み失敗')}e.target.value=''};
+ try{if(t.includes('const CH=[')){loadGame(t,f.name)}else{
+  try{B=JSON.parse(t)}catch(_){const w={};new Function('window',t)(w);B=w.BALANCE}
+  let ng=0;for(const id in B){const c=E.find(x=>x.id==id);if(c)Object.assign(c,cl(B[id]));else ng++}toast(ng?'読み込みました（未登録のID '+ng+'件は無視）':'読み込みました');render();upd()}}catch(err){toast('読み込み失敗')}e.target.value=''};
+$('#bSj').onclick=()=>$('#fj').click();
+$('#fj').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{loadGame(await f.text(),f.name)}catch(err){toast('script.js を読み込めませんでした')}e.target.value=''};
 $('#bRc').onclick=()=>{if(confirm(E[cur].n+' を初期値に戻しますか？')){E[cur]=cl(BASE[cur]);render();upd()}};
 $('#bRa').onclick=()=>{if(confirm('全キャラの変更を初期値に戻しますか？')){E=cl(BASE);render();upd()}};
-render();
+(async()=>{let g=null,src='';
+ try{const r=await fetch('./script.js',{cache:'no-store'});if(r.ok){g=parseGame(await r.text());src='script.js（自動）'}}catch(_){}
+ const auto=!!g;
+ if(!g)try{const c=JSON.parse(localStorage.getItem(CK)||'null');if(c&&c.chars&&c.chars.length){g=c;src='前回読み込んだ script.js'}}catch(_){}
+ if(!g){g={chars:SNAP,AD:SNAP_AD,df:.6};src='内蔵データ（script.js を読めませんでした）'}
+ let m=null;try{m=JSON.parse(localStorage.getItem(DK)||'null')}catch(_){}
+ setBase(g,src,auto,m||oldEdits(prep(g.chars,g.AD,g.df)));render();upd(1)})();
 </script></body></html>

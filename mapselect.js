@@ -3,6 +3,7 @@
    ・モードごとにカードが並ぶ。カードのヘッダ＝モードの色・アイコン・モード名・マップ名、下の絵＝バナー
        エメラルドハント … 紫 / アイコン=ui1.png(無ければ描いたマーク) / 洞窟マップ → banner.png
        ノックアウト     … オレンジ / アイコン=nocki.png(無ければ描いたマーク) / 砂漠マップ → banner2.png
+       強奪(ヘイスト)  … ピンク / アイコン=gouda.png(無ければ描いたマーク) / お菓子マップ → banner3.png
      画像が同じフォルダに無いときは、描いたマークとグラデーションで代用する
    ・カードをタップ → そのマップを選んで読み込み直す(マップは起動時に組み立てるため)
    ・カード右上の i → マップ全体の簡易マップ(地形・出撃位置・凡例)
@@ -21,10 +22,13 @@
       maps: [{ id: 'gem', name: 'ごつごつ坑道', bg: 'cave' }] },
     { id: 'ko', name: 'ノックアウト', col: '#f58a16', dark: '#b85d00',
       rule: '相手チームを全滅させたらそのラウンドの勝ち。やられたら、そのラウンドが終わるまで復活できない。3ラウンドのうち先に2ラウンド取ったチームの勝ち。時間がたつと毒ガスが迫ってくる。内側の壁は、壁を壊せる攻撃で壊れる。',
-      maps: [{ id: 'ko', name: 'ゴールドアームの渓谷', bg: 'desert' }] }
+      maps: [{ id: 'ko', name: 'ゴールドアームの渓谷', bg: 'desert' }] },
+    { id: 'hs', name: '強奪', col: '#e83fa0', dark: '#9c1a6c',
+      rule: '相手チームの金庫(HP 80000)を先に壊したチームの勝ち。制限時間内に壊せなければ、金庫のHPが多く残っているチームの勝ち。やられても少しすると復活できるので、自分の金庫も守ろう。内側のクッキーの壁は、壁を壊せる攻撃で壊れる。',
+      maps: [{ id: 'hs', name: 'お菓子の金庫室', bg: 'candy' }] }
   ];
   /* マップメーカーで作った maps.js のマップを、モードごとのカード一覧に足す */
-  (window.MAPS || []).forEach(m => { if (m.builtin) return; const md = MODES.find(x => x.id === m.mode); if (md) md.maps.push({ id: m.id, name: String(m.name).replace(/[<>&"]/g, ''), bg: m.mode === 'ko' ? 'desert' : 'cave' }); });
+  (window.MAPS || []).forEach(m => { if (m.builtin) return; const md = MODES.find(x => x.id === m.mode); if (md) md.maps.push({ id: m.id, name: String(m.name).replace(/[<>&"]/g, ''), bg: m.mode === 'ko' ? 'desert' : m.mode === 'hs' ? 'candy' : 'cave' }); });
   const ALL = [];
   MODES.forEach(m => m.maps.forEach(mp => ALL.push({ mode: m, map: mp })));
   const cur = () => ALL.find(e => e.map.id === MAPID) || ALL[0];
@@ -43,13 +47,16 @@
     const g = document.querySelector('#hm .gm');
     return g ? g.outerHTML.replace('class="gm"', 'class="gs"') : '<svg viewBox="0 0 64 64"><path d="M38 14 60 27V52L38 64 16 52V27Z" fill="#a66bff" stroke="#1b0a33" stroke-width="3"/></svg>';
   })();
-  const iconHTML = id => `<span class="mi ${id}">${id === 'ko' ? koSVG : gemSVG}</span>`;
+  const hsSVG = (() => {   /* gouda.png が無い時の強奪アイコン：金庫 */
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><g stroke="#1b0a33" stroke-width="2.6" stroke-linejoin="round"><rect x="9" y="8" width="46" height="46" rx="7" fill="#5f9be6"/><rect x="15" y="14" width="34" height="34" rx="4" fill="#3d72cc"/><rect x="14" y="54" width="8" height="5" fill="#2a4f96"/><rect x="42" y="54" width="8" height="5" fill="#2a4f96"/><circle cx="32" cy="31" r="10" fill="#ffc53a"/><circle cx="32" cy="31" r="4.5" fill="#ffe27a"/></g><path d="M32 31V22M32 31h8" stroke="#1b0a33" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+  })();
+  const iconHTML = id => `<span class="mi ${id}">${id === 'ko' ? koSVG : id === 'hs' ? hsSVG : gemSVG}</span>`;
 
   /* ---------- ホームのイベント枠 ---------- */
   function applyHome() {
     const c = cur();
-    HTML.classList.toggle('ko-sel', c.mode.id === 'ko');
-    const k = $('#hmko'); if (k) k.innerHTML = koSVG;
+    HTML.classList.toggle('ko-sel', c.mode.id !== 'gem');   /* ジェム以外(ノックアウト・強奪)の時は、ホームの枠のジェムの絵をモードのアイコンに差し替える */
+    const k = $('#hmko'); if (k) { k.className = 'mi ' + (c.mode.id === 'hs' ? 'hs' : 'ko'); k.innerHTML = c.mode.id === 'hs' ? hsSVG : koSVG; }
     const n = $('#hmn'), m = $('#hmm');
     if (n) n.textContent = c.mode.name;
     if (m) m.textContent = c.map.name;
@@ -105,6 +112,8 @@
   function open() {
     build();
     const L = $('#msl');
+    /* 強奪はマルチプレイ未対応：ルームのマップ選びの時は出さない */
+    document.querySelectorAll('#ms [data-mode="hs"]').forEach(el => { el.style.display = roomMode !== null ? 'none' : ''; });
     L.querySelectorAll('.mc').forEach(c => {
       const on = c.dataset.map === curId();
       c.classList.toggle('on', on);
@@ -137,10 +146,12 @@
   /* ---------- 簡易マップ ---------- */
   const PAL = {
     gem: { bg: '#6c5462', '#': '#252a78', R: '#d8d0f4', K: '#e650e0', C: '#e0963a', B: '#8f5a2c', b: '#2fbfa0' },
-    ko: { bg: '#f4a775', F: '#c98a4b', W: '#d0613f', '~': '#2fa3f0', b: '#f1a31a', C: '#e0963a', B: '#8f5a2c', c: '#3fa860' }
+    ko: { bg: '#f4a775', F: '#c98a4b', W: '#d0613f', '~': '#2fa3f0', b: '#f1a31a', C: '#e0963a', B: '#8f5a2c', c: '#3fa860' },
+    hs: { bg: '#3f8791', W: '#f7a31f', S: '#4f86d8', b: '#e0307f', L: '#2f8cff', M: '#ff9fc8', P: '#e0307f', Y: '#e0123a' }
   };
-  const NAMES = { '#': 'がけ', R: '岩', K: 'クリスタル', C: '木箱', B: 'たる', W: '壁(壊せる攻撃で壊れる)', F: '柵', '~': '水', b: 'ブッシュ', c: 'サボテン' };
-  const SPAWN = { gem: { b: 30.5, t: 2.5 }, ko: { b: 33.5, t: 1.5 } };
+  const NAMES = { '#': 'がけ', R: '岩', K: 'クリスタル', C: '木箱', B: 'たる', W: '壁(壊せる攻撃で壊れる)', F: '柵', '~': '水', b: 'ブッシュ', c: 'サボテン', S: '金庫', L: 'ロリポップ', M: 'マシュマロ', P: 'ロープ', Y: 'さくらんぼ' };
+  const NAMES_HS = { W: 'クッキーの壁(壊せる攻撃で壊れる)', L: 'ロリポップ(通れないが弾は通る)', M: 'マシュマロ(通れないが弾は通る)', P: 'キャンディロープ(通れないが弾は通る)', Y: 'さくらんぼ(通れないが弾は通る)', S: '金庫(HP 80000)', b: 'ブッシュ' };
+  const SPAWN = { gem: { b: 30.5, t: 2.5 }, ko: { b: 33.5, t: 1.5 }, hs: { b: 32.25, t: 0.75 } };
   const SPX = [8.5, 10.5, 12.5];
   const SPP = {};
   Object.keys(SPAWN).forEach(k => { SPP[k] = { b: SPX.map(x => [x, SPAWN[k].b]), t: SPX.map(x => [x, SPAWN[k].t]) }; });
@@ -160,11 +171,14 @@
       if (!c || t === 'bg' || t === '.') continue;
       x.fillStyle = c;
       if (t === '#') { x.fillRect(px, py, T, T); continue; }
+      if (t === 'S') { rr(px - 2, py - 2, T + 4, T + 4, 4); x.fill(); x.strokeStyle = '#1b2a5a'; x.lineWidth = 1.6; x.stroke(); x.fillStyle = '#ffd23f'; x.beginPath(); x.arc(px + T / 2, py + T / 2, T * .24, 0, 7); x.fill(); continue; }
+      if (t === 'L' || t === 'M' || t === 'Y') { x.beginPath(); x.arc(px + T / 2, py + T / 2, T * .38, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.45)'; x.beginPath(); x.arc(px + T * .38, py + T * .36, T * .1, 0, 7); x.fill(); continue; }
+      if (t === 'P') { rr(px, py + T * .22, T, T * .56, T * .26); x.fill(); continue; }
       if (t === 'F') { x.fillRect(px, py + T * .3, T, T * .4); x.fillStyle = 'rgba(255,255,255,.3)'; x.fillRect(px, py + T * .3, T, 2); continue; }
       if (t === '~') { rr(px + 1, py + 1, T - 2, T - 2, 4); x.fill(); x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(px + 4, py + 5, T * .45, 2); continue; }
       if (t === 'b') {
         rr(px + 1, py + 1, T - 2, T - 2, 5); x.fill();
-        x.fillStyle = pal === PAL.ko ? '#ffd445' : '#7cf0d0';
+        x.fillStyle = pal === PAL.hs ? '#ff9ec7' : pal === PAL.ko ? '#ffd445' : '#7cf0d0';
         [[.3, .35], [.68, .4], [.48, .7]].forEach(([a, b]) => { x.beginPath(); x.arc(px + T * a, py + T * b, T * .16, 0, 7); x.fill(); });
         continue;
       }
@@ -178,7 +192,7 @@
       if (t === 'C') { x.beginPath(); x.moveTo(px + 3, py + 3); x.lineTo(px + T - 3, py + T - 3); x.moveTo(px + T - 3, py + 3); x.lineTo(px + 3, py + T - 3); x.stroke(); }
     }
     /* 中央(ジェムの湧く場所) */
-    const cx = 10.5 * T, cz = h / 2 * T;
+    const cx = 10.5 * T, cz = pal === PAL.hs ? -99 : h / 2 * T;   /* 強奪にはジェムの湧く場所が無い(画面の外に描いて消す) */
     x.fillStyle = 'rgba(255,92,230,.9)'; x.strokeStyle = '#fff'; x.lineWidth = 2;
     x.beginPath(); x.moveTo(cx, cz - T * .8); x.lineTo(cx + T * .8, cz); x.lineTo(cx, cz + T * .8); x.lineTo(cx - T * .8, cz); x.closePath(); x.fill(); x.stroke();
     /* 出撃位置：下＝自分のチーム(青)、上＝相手(赤) */
@@ -201,8 +215,8 @@
     rows.forEach(r => { for (const t of r) seen[t] = 1; });
     const L = $('#mpl'); L.innerHTML = '';
     const add = (c, n) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${c}"></i>${n}`; L.appendChild(s); };
-    Object.keys(NAMES).forEach(t => { if (seen[t] && PAL[key][t]) add(PAL[key][t], NAMES[t]); });
-    add('#ff5ce6', 'ジェムが出る場所');
+    Object.keys(NAMES).forEach(t => { if (seen[t] && PAL[key][t]) add(PAL[key][t], (e.mode.id === 'hs' && NAMES_HS[t]) || NAMES[t]); });
+    if (e.mode.id !== 'hs') add('#ff5ce6', 'ジェムが出る場所');
     add('#37a3ff', '自分のチームの出撃位置');
     add('#ff4a4a', '相手の出撃位置');
     P.hidden = false;
@@ -223,6 +237,6 @@
     open, info,
     entry: id => ALL.find(e => e.map.id === id) || null,
     icon: iconHTML,
-    openFor(id) { roomMode = id || MAPID; setView('maps'); }
+    openFor(id) { const r = id || MAPID; roomMode = r === 'hs' ? 'gem' : r; setView('maps'); }
   };
 })();

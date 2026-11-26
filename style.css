@@ -441,3 +441,21 @@ html.ko-mode #top>.s,html.ko-mode #top>#clock{display:none}
 #mrm.lock .mrmc{display:none}
 #mrm.lock:active{transform:none}
 #mrm.lock{padding-right:3.4vmin}
+
+/* ============================================================
+   強奪(ヘイスト)：アイコン=gouda.png(無ければ描いた金庫のマーク)・バナー=banner3.png(無ければピンクのグラデーション)
+   上のHUD：左=自分の金庫のHP(青) / 真ん中=時計 / 右=相手の金庫のHP(赤)
+   ============================================================ */
+html.has-gouda .mi.hs{background:url(gouda.png) center/contain no-repeat;filter:drop-shadow(0 .4vmin 0 #0007)}
+html.has-gouda .mi.hs svg{display:none}
+.mb.candy{background-image:linear-gradient(170deg,#ff9ed0,#ff6fae 55%,#52c7c0)}.mb.candy::after{content:'🍭'}
+html.has-banner3 .mb.candy{background-image:url(banner3.png)}html.has-banner3 .mb.candy::after{content:none}
+html.hs-mode #top>.s{display:none}
+html.hs-mode #top{justify-content:center}
+html.hs-mode #clock{position:relative;z-index:2;min-width:15vmin;padding:.7vmin 3.4vmin;border-radius:3vmin;background:#0009;color:#fff;font-size:5.4vmin;font-weight:800;text-align:center;line-height:1.2}
+#hst{position:absolute;left:0;right:0;top:0;height:11vmin;pointer-events:none}
+#hst .hsb{position:absolute;top:2.2vmin;width:36vmin;height:6.2vmin;background:#0b1636;border:.5vmin solid #0b1636;border-radius:1vmin;overflow:hidden;box-shadow:0 .5vmin 0 #0007}
+#hst .hsb.l{left:2vmin}#hst .hsb.r{right:2vmin}
+#hst .hsb i{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(#9bebff,#38b9ff 55%,#1a8ae0);transition:width .15s}
+#hst .hsb.r i{left:auto;right:0;background:linear-gradient(#ff9aa2,#ff4552 55%,#d01a2c)}
+#hst .hsb b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:4.6vmin;line-height:1;color:#fff}

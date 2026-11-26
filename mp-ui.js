@@ -63,7 +63,17 @@
   }
 
   /* ---------- 開く／戻る ---------- */
-  function open() {
+  /* Firebase は起動時に読み込まず、マルチプレイを開く時に初めて読み込む(index.html の GFLoadFB) */
+  let fbBusy = false;
+  function withFB(f) {
+    if (typeof firebase !== 'undefined' || !window.GFLoadFB) { f(); return; }
+    if (fbBusy) return;
+    fbBusy = true;
+    toast('接続中…', 1500);
+    window.GFLoadFB(() => { fbBusy = false; f(); });
+  }
+  function open() { withFB(open0); }
+  function open0() {
     const n = getNet();
     if (!n) { toast('オンライン機能を読み込めませんでした。通信を確認してください', 3200); return; }
     build();
@@ -76,7 +86,7 @@
     const my = ++tok;
     const fail = m => { if (my !== tok || started) return; wait(m || '接続できませんでした。戻ってもう一度お試しください', true); };
     const wd = setTimeout(() => { if (my === tok && !L) { fail('接続できませんでした（通信状態を確認してください）'); n.leave(); } }, 16000);
-    n.joinRandom({ name: myName(), nc: window.PF ? PF.nc() : 0, ch: sel, map: MAPID }, onLobby).then(() => {
+    n.joinRandom({ name: myName(), nc: window.PF ? PF.nc() : 0, ch: sel, map: MAPID === 'hs' ? 'gem' : MAPID }, onLobby).then(() => {
       clearTimeout(wd);
       if (my !== tok) { n.leave(); return; }      // 待っている間に戻った
       wait(null);
@@ -131,7 +141,8 @@
     setTimeout(() => { handing = false; wait(null); }, 4000);
   }
   /* 引き継ぐ側(切り替わった先のマップ画面)：同じ人・同じルームとして監視を再開する */
-  function adopt(r) {
+  function adopt(r) { withFB(() => adopt0(r)); }
+  function adopt0(r) {
     if (!r || !/^[\w-]+$/.test(r.rid || '') || !/^[\w-]+$/.test(r.pid || '')) return;
     net = null;
     const n = getNet(r.pid);
