@@ -7,8 +7,8 @@
 const VFX=(()=>{
 const T=THREE,rnd=Math.random,PI=Math.PI,TAU=PI*2;
 let gs=null,cam=null,light=null,lt=0,fr=0;
-const GT=(window.GQ&&GQ.t!=null)?GQ.t:2,lowEnd=(navigator.hardwareConcurrency||8)<=4||Math.min(devicePixelRatio||1,2)>=3||GT==0;
-const Q=lowEnd?.6:GT==1?.8:1,N=k=>Math.max(1,Math.round(k*Q));
+const lowEnd=(navigator.hardwareConcurrency||8)<=4||Math.min(devicePixelRatio||1,2)>=3;
+const Q=lowEnd?.6:1,N=k=>Math.max(1,Math.round(k*Q));
 const R=(a,b)=>a+rnd()*(b-a),H=c=>[(c>>16&255)/255,(c>>8&255)/255,(c&255)/255];
 const FLAME_W=.5;   /* ユニバードの炎の基準幅。攻撃範囲(エイム表示)の幅と同じ。炎の太さを変えたいときはこの数字だけ */
 

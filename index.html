@@ -11,23 +11,6 @@ html.wrap iframe.on{z-index:2;pointer-events:auto}
 html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;justify-content:center;background:rgba(20,11,36,.6);color:#fff;font:800 5vmin/1 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;pointer-events:auto}
 </style>
 <script>
-/* ★ 画質ランク GQ.t（0=低スペック 1=ふつう 2=高性能）。端末の性能から自動判定して、各スクリプトが解像度・影・先読みを調整する。
-   手動で固定したい時は URL に ?q=low / ?q=mid / ?q=high を付ける（?q=auto で自動に戻す。設定は端末に記憶）。 */
-(function(){var N=navigator,LS=function(k,v){try{if(v===undefined)return localStorage.getItem(k);if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}},
- m=/[?&]q=(low|mid|high|auto)(?:&|$)/.exec(location.search),ov;
- if(m){ov=m[1];LS('gemrush_q',ov==='auto'?null:ov);if(ov==='auto')ov=null}else ov=LS('gemrush_q');
- var mem=N.deviceMemory||0,cores=N.hardwareConcurrency||4,gpu=LS('gemrush_gpu');
- if(gpu===null||gpu===undefined){gpu='';   /* GPU名は最初の1回だけ調べて記憶する */
-  try{var c=document.createElement('canvas'),g=c.getContext('webgl')||c.getContext('experimental-webgl'),e=g&&g.getExtension('WEBGL_debug_renderer_info');
-   if(e)gpu=String(g.getParameter(e.UNMASKED_RENDERER_WEBGL)||'');if(g){var l=g.getExtension('WEBGL_lose_context');if(l)l.loseContext()}}catch(x){}
-  LS('gemrush_gpu',gpu||'-')}
- var soft=/SwiftShader|llvmpipe|softpipe|Software|Basic Render|Mali-4\d\d|Mali-T[678]\d\d|Adreno \(TM\) [234]\d\d\b|PowerVR SGX/i.test(gpu),
-  weak=/Intel\(R\) (HD|UHD) Graphics|Mali-G(31|51|52)\b|Adreno \(TM\) 5[01]\d\b/i.test(gpu),
-  t=soft||(mem&&mem<=2)||cores<=2?0:(mem&&mem<=4)||cores<=4||weak?1:2;
- if(ov==='low')t=0;else if(ov==='mid')t=1;else if(ov==='high')t=2;
- window.GQ={t:t,gpu:gpu,mem:mem,cores:cores,ov:ov||'auto'}})();
-</script>
-<script>
 /* ★ index.html 1枚で「外枠」と「ゲーム本体」の両方をまかなう（以前の index.html + game.html を統合）
    ・ふつうに開く → 外枠モード：マップごとに「自分自身(index.html)」を iframe で開いて切り替える
    ・iframe の中 / ?nowrap=1 で開く → ゲームモード：ゲーム本体を読み込んで遊ぶ
@@ -58,6 +41,7 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
 </div>
 <div id="home" class="ov">
  <button id="hpf" aria-label="プロフィール"><span class="pfi"></span><span class="pfx"><b class="tx pfn"></b><small class="tx">プロフィール</small></span></button>
+ <button id="hcfg" aria-label="設定"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.6.7 2.2-1.5 2.4 2.4-1.5 2.2.7 1.6 2.6.5v3.4l-2.6.5-.7 1.6 1.5 2.2-2.4 2.4-2.2-1.5-1.6.7-.5 2.6h-3.4l-.5-2.6-1.6-.7-2.2 1.5-2.4-2.4 1.5-2.2-.7-1.6L2 13.7v-3.4l2.6-.5.7-1.6-1.5-2.2 2.4-2.4 2.2 1.5 1.6-.7z" fill="#fff" stroke="#0c1226" stroke-width="1.1" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.5" fill="#3a4263" stroke="#0c1226" stroke-width="1.1"/></svg></button>
  <button id="hc"><span id="hci"></span><b class="tx">キャラクター</b></button>
  <button id="hmp" aria-label="マルチプレイ"><span id="hmpi">👥</span><b class="tx">マルチプレイ</b></button>
  <div id="hm">
@@ -96,6 +80,9 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
 </div>
 <div id="pn" class="ov" hidden>
  <div id="pnc"><b class="tx">名前を入力（10文字まで）</b><input id="pni" type="text" maxlength="10" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><div id="pnb"><button id="pnx" class="tx">キャンセル</button><button id="pno" class="tx">OK</button></div></div>
+</div>
+<div id="st" class="ov" hidden>
+ <div id="stc"><b class="tx" id="stt">設定</b><div id="stl"></div><p class="tx" id="stn" hidden>アンチエイリアスと影の変更は、再読み込みで反映されます</p><div id="stb"><button id="stx" class="tx">閉じる</button><button id="sto" class="tx" hidden>再読み込みして反映</button></div></div>
 </div>
 <div id="mp" class="ov" hidden>
  <div id="mpc">
@@ -139,7 +126,7 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
 
  /* ===== ゲームモード（旧 game.html） ===== */
  if(!GF.wrap){
-  (function(){var h=document.documentElement;['ui1','ui2','ui3','ui4','ui5','ui6','nocki','gouda','banner','banner2','banner3'].forEach(function(k){var i=new Image();i.onload=function(){h.classList.add('has-'+k)};i.src=k+'.png'})})();
+  (function(){var h=document.documentElement;['ui1','ui2','ui3','ui4','ui5','ui6','setting','nocki','gouda','banner','banner2','banner3'].forEach(function(k){var i=new Image();i.onload=function(){h.classList.add('has-'+k)};i.src=k+'.png'})})();
   var tpl=document.getElementById('game-markup'),html=tpl.textContent;tpl.parentNode.removeChild(tpl);
   /* 裏で先読みされるフレーム(bg=1)は動画を自動再生・事前読み込みしない(複数マップ分の動画デコードで重くなるのを防ぐ)。手前に出た時に script.js が再生する */
   if(/[?&]bg=1/.test(Q))html=html.replace(' autoplay','').replace('preload="auto"','preload="none"');
@@ -165,6 +152,7 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
    'bot-ai.js',
    'mapselect.js',
    'profile.js',
+   'settings.js',
    'firebase-config.js',
    'mp-net.js',
    'mp-game.js',
@@ -181,9 +169,11 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
  var cv=document.createElement('div');cv.id='cv';cv.textContent='読み込み中…';document.body.appendChild(cv);
  function initWrap(){
  var P=new URLSearchParams(Q),first=P.get('map');
- var lim=P.get('preload'),GT=(window.GQ&&GQ.t!=null)?GQ.t:2;
- /* 先読み数：高性能=全マップ(従来どおり) / ふつう=1つ / 低スペック=先読みしない。保持するフレーム数にも上限をつけてメモリを節約 */
- lim=lim===null?(GT==0?0:GT==1?1:99):Math.max(0,parseInt(lim,10)||0);var KEEP=GT==0?2:GT==1?3:99;
+ var lim,KEEP,PQ=P.get('preload');
+ /* 先読み数は設定(ホーム右上の歯車)で決める：高=全マップ(ブロスタ本家のようにすぐ切り替わる) / 中=1つ / 低=しない。?preload=数 で直接指定も可 */
+ function pol(){var pl=2;try{var o=JSON.parse(localStorage.getItem('gemrush_cfg')||'{}');if(o.pl===0||o.pl===1)pl=o.pl}catch(e){}
+  lim=PQ!==null?Math.max(0,parseInt(PQ,10)||0):(pl==2?99:pl);KEEP=pl==2?99:pl==1?3:1}
+ pol();
  var okId=function(s){return /^[\w-]+$/.test(s||'')};
  if(!okId(first)){try{var st=localStorage.getItem('gemrush_map');first=okId(st)?st:'gem'}catch(e){first='gem'}}
  P.delete('map');P.delete('bg');P.delete('preload');
@@ -218,6 +208,8 @@ html.wrap #cv{position:fixed;inset:0;z-index:5;display:none;align-items:center;j
    if(k===cur||k===first||!LD[k]||(pend&&pend.m===k))continue;
    try{F[k].src='about:blank';F[k].parentNode&&F[k].parentNode.removeChild(F[k])}catch(e){}
    delete F[k];delete LD[k];delete BG[k]}}
+ /* 設定が変わったら(別フレームの設定画面から)すぐ反映：先読みを増やす/余分なフレームを破棄する */
+ addEventListener('storage',function(e){if(e.key==='gemrush_cfg'){pol();trim();next(300)}});
  function post(m,d){try{F[m]&&F[m].contentWindow.postMessage(d,'*')}catch(e){}}
  function show(m,sel,room){
   var old=cur;cur=m;

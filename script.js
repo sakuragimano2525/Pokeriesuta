@@ -1,9 +1,13 @@
 /* MiSans を先に読み込む（3D内の名前表示など canvas 文字にも使うため） */
 try{document.fonts&&document.fonts.load('700 24px MiSans','あAa0')}catch(e){}
-const MAPS_=Array.isArray(window.MAPS)?window.MAPS:[],MAPID=(()=>{try{const ok=q=>q==='ko'||q==='gem'||q==='hs'||MAPS_.some(m=>m.id===q&&!m.builtin);const q=new URLSearchParams(location.search).get('map');if(ok(q)){if(!/[?&]bg=1/.test(location.search))localStorage.setItem('gemrush_map',q);return q}const s=localStorage.getItem('gemrush_map');return ok(s)?s:'gem'}catch(e){return'gem'}})(),CMAP=MAPS_.find(m=>m.id===MAPID&&!m.builtin),KO=(CMAP?CMAP.mode:MAPID)==='ko',HS=(CMAP?CMAP.mode:MAPID)==='hs',KV=KO||HS;   /* KO=ノックアウトのルール / HS=強奪(ヘイスト)のルール / KV=本家風カメラ・照明・草(ノックアウトと強奪で共通) */
+const MAPS_=Array.isArray(window.MAPS)?window.MAPS:[],MAPID=(()=>{try{const ok=q=>q==='ko'||q==='gem'||q==='hs'||MAPS_.some(m=>m.id===q&&!m.builtin);const q=new URLSearchParams(location.search).get('map');if(ok(q)){if(!/[?&]bg=1/.test(location.search))localStorage.setItem('gemrush_map',q);return q}const s=localStorage.getItem('gemrush_map');return ok(s)?s:'gem'}catch(e){return'gem'}})(),CMAP=MAPS_.find(m=>m.id===MAPID&&!m.builtin),KO=(CMAP?CMAP.mode:MAPID)==='ko',HS=(CMAP?CMAP.mode:MAPID)==='hs',
+THM=(()=>{const t=CMAP&&CMAP.theme;return t==='cave'||t==='desert'||t==='candy'?t:(KO?'desert':HS?'candy':'cave')})(),THD=THM==='desert',THC=THM==='candy',KV=THD||THC;
+/* ★ルールと見た目は別々：KO=ノックアウトのルール / HS=強奪(ヘイスト)のルール(どちらでもなければエメラルドハント)
+   THM=見た目のテーマ('cave'=洞窟 / 'desert'=砂漠 / 'candy'=お菓子)。マップごとに maps.js の "theme" で決める(無ければモードのもとのテーマ)
+   KV=本家風カメラ・照明・草(砂漠とお菓子のテーマで共通) */
 const T=THREE,W=21,H=CMAP?CMAP.rows.length:KO?35:33,$=s=>document.querySelector(s);
 /* マップメーカー(index.htm)で作ったマップの出撃位置。無い時は従来の固定位置 */
-const SPW=(()=>{const d=CMAP&&CMAP.spawn,df=KO?{b:H-1.5,t:1.5}:HS?{b:H-.75,t:.75}:{b:30.5,t:2.5},f=(a,z)=>{const p=(a&&a.length?a:[8.5,10.5,12.5].map(x=>[x,z])).slice(0,3);while(p.length<3)p.push(p[p.length-1]);return p};return{b:f(d&&d.blue,df.b),t:f(d&&d.red,df.t)}})();
+const SPW=(()=>{const d=CMAP&&CMAP.spawn,df=THD?{b:H-1.5,t:1.5}:THC?{b:H-.75,t:.75}:{b:H-2.5,t:2.5},f=(a,z)=>{const p=(a&&a.length?a:[8.5,10.5,12.5].map(x=>[x,z])).slice(0,3);while(p.length<3)p.push(p[p.length-1]);return p};return{b:f(d&&d.blue,df.b),t:f(d&&d.red,df.t)}})();
 /* ---------- キャラ定義 ---------- */
 const CH=[
 {id:0,n:'エルゼ',role:'ブイブイ言わせてる',col:'#b46bff',ic:'🔮',hp:3800,sp:3.9,rl:1.3,ch:.012,sf:'elzeShot',ss:'elzeStar',su:'スーパースター',a:{n:5,spr:.55,d:340,v:20,rng:7},s:{n:9,spr:.95,jit:.03,d:360,v:22,rng:7,size:.26,star:1,kb:3.4,brk:.3,air:5.5},da:'近距離で5発の散弾を放つ',ds:'障害物も敵も吹き飛ばす高威力。攻撃に耐えた敵も押し戻してしまう。'},
@@ -37,36 +41,57 @@ CH.forEach(c=>{if(c.sch==null)c.sch=Math.max(1,Math.round(100/((c.a.d||300)*(c.c
 const chr=c=>100/c.sch/(c.a.d||300);/* 継続ダメージ(炎・ゾーンなど)用：ダメージ比例の換算率 */
 
 /* ---------- three 基本 ---------- */
-/* ---------- 画質ランク(GQ.t は index.html で端末性能から判定。0=低スペック 1=ふつう 2=高性能) ----------
-   高性能(2)は従来とまったく同じ画質。低いランクほど「解像度の上限・影の解像度/更新頻度・AA・テクスチャ」を控えめにする。
-   pr=解像度の上限 mn=自動解像度で下げてよい下限 sm=影の解像度 sk=影を1フレームおきにする an=異方性 tx=床テクスチャ最大サイズ c60=60fps上限 */
-const QT=Math.max(0,Math.min(2,(window.GQ&&GQ.t!=null)?GQ.t:2)),
- GQP=[{aa:false,pr:1.25,mn:.55,sm:1024,st:T.PCFShadowMap,sk:1,an:2,tx:512,c60:1},
-      {aa:true,pr:1.5,mn:.7,sm:1024,st:T.PCFSoftShadowMap,sk:0,an:4,tx:1024,c60:1},
-      {aa:true,pr:1.75,mn:.8,sm:2048,st:T.PCFSoftShadowMap,sk:0,an:8,tx:1024,c60:0}][QT];
-const R=new T.WebGLRenderer({antialias:GQP.aa,alpha:true,stencil:false,powerPreference:'high-performance'});
-const DPR0=Math.min(devicePixelRatio||1,GQP.pr);R.setPixelRatio(DPR0);R.shadowMap.enabled=true;R.shadowMap.type=GQP.st;R.outputEncoding=T.sRGBEncoding;$('#app').prepend(R.domElement);
+/* ---------- 設定(ホーム右上の歯車)：解像度 / アンチエイリアス / 影 / マップ先読み ----------
+   各項目 0=低 1=中 2=高(最高・初期値＝従来と同じ画質)。端末ごとに localStorage('gemrush_cfg') へ保存。
+   解像度とマップ先読みはすぐ反映。アンチエイリアスと影は描画の作り直しが必要なので、変更したら再読み込みして反映する(settings.js)。 */
+const GCFG=(()=>{const K='gemrush_cfg',D={res:2,aa:2,sh:2,pl:2},rd=()=>{const c={...D};try{const o=JSON.parse(localStorage.getItem(K));if(o)for(const k in D){const v=+o[k];if(v===0||v===1||v===2)c[k]=v}}catch(e){}return c},boot=rd();let cur={...boot};
+ return{K,D,boot,get:k=>cur[k],set(k,v){cur[k]=v;try{localStorage.setItem(K,JSON.stringify(cur))}catch(e){}},sync(){cur=rd()},need:()=>cur.aa!==boot.aa||cur.sh!==boot.sh}})();
+/* 解像度：描画サイズの倍率(低50% / 中75% / 高100%)。100%は従来の min(devicePixelRatio,1.75)。影：中=軽い影(1024) 高=従来(2048・なめらか) 低=なし */
+const RESM=[.5,.75,1],prOf=()=>Math.round(Math.min(devicePixelRatio||1,1.75)*RESM[GCFG.get('res')]*100)/100,
+ SHW=[null,{sm:1024,st:T.PCFShadowMap},{sm:2048,st:T.PCFSoftShadowMap}][GCFG.boot.sh];
+/* アンチエイリアス：高=MSAA(従来) / 中=FXAA(下のFXR) / 低=なし */
+const R=new T.WebGLRenderer({antialias:GCFG.boot.aa==2,alpha:true,stencil:false,powerPreference:'high-performance'});
+const RES={p:prOf()};R.setPixelRatio(RES.p);R.shadowMap.enabled=!!SHW;R.shadowMap.type=SHW?SHW.st:T.PCFSoftShadowMap;R.outputEncoding=T.sRGBEncoding;$('#app').prepend(R.domElement);
 /* RZ.small=裏で待機中のフレーム：描画バッファを1x1に縮めてGPUメモリを空ける(手前に出る時に rs() で元に戻す) */
 const RZ={small:/[?&]bg=1/.test(location.search)?1:0};
-/* 自動解像度(DRS)：プレイ中のフレーム時間を測り、60fpsを保てないほど遅ければ解像度を段階的に下げ、余裕があれば少しずつ戻す。
-   下げても速くならない(=CPUが原因)と分かったら元に戻して、むだにぼやけさせない。メニュー画面は常に最大解像度 */
-const DRS={mx:DPR0,mn:Math.min(DPR0,GQP.mn),pr:DPR0,cur:DPR0,acc:0,n:0,good:0,fl:0,dn:0,frz:0,ceil:DPR0,ct:0,prev:0,base:DPR0};
-try{const sv=parseFloat(localStorage.getItem('gemrush_pr'));if(sv>=DRS.mn&&sv<=DRS.mx)DRS.pr=DRS.ceil=sv}catch(e){}
-function drsApply(p){if(RZ.small||DRS.cur===p)return;DRS.cur=p;try{R.setPixelRatio(p)}catch(e){}}
-function drsTick(ms){
- if(ms>90||ms<2)return;
- DRS.acc+=ms;if(++DRS.n<40)return;
- const avg=DRS.acc/DRS.n;DRS.acc=0;DRS.n=0;const p0=DRS.pr;
- if(DRS.frz>0)DRS.frz--;
- if(DRS.ct>0&&--DRS.ct==0)DRS.ceil=DRS.mx;   /* 「重すぎ」と分かった上限は、しばらくしたら解除して再挑戦 */
- if(avg>21&&DRS.pr>DRS.mn+.01&&DRS.frz<=0){
-  if(DRS.dn>0&&avg>DRS.prev*.95){if(++DRS.fl>=2){DRS.pr=DRS.base;DRS.frz=60;DRS.dn=0;DRS.fl=0;DRS.good=0}}else DRS.fl=0;
-  if(DRS.pr===p0){if(DRS.dn==0)DRS.base=DRS.pr;DRS.prev=avg;DRS.dn++;DRS.pr=Math.max(DRS.mn,Math.round(DRS.pr*.85*100)/100);DRS.ceil=Math.min(DRS.ceil,DRS.pr+.15);DRS.ct=90;DRS.good=0}
- }else if(avg<=18.5){
-  DRS.dn=0;DRS.fl=0;
-  if(++DRS.good>=14&&DRS.pr<Math.min(DRS.mx,DRS.ceil)-.01){DRS.pr=Math.min(DRS.mx,DRS.ceil,Math.round((DRS.pr*1.1+.02)*100)/100);DRS.good=0}
- }else DRS.good=0;
- if(DRS.pr!==p0)try{localStorage.setItem('gemrush_pr',DRS.pr)}catch(e){}}
+function applyRes(force){const p=prOf();if(p===RES.p&&!force)return;RES.p=p;if(!RZ.small)try{R.setPixelRatio(p)}catch(e){}}   /* 裏のフレームは手前に出る時に反映 */
+addEventListener('storage',e=>{if(e.key===GCFG.K){GCFG.sync();applyRes()}});   /* 別のマップ(iframe)の設定画面で変えた時 */
+/* FXR(scene,camera)：アンチエイリアス「中」の時だけ FXAA(後処理)で描く。シーンをいったんテクスチャへ描き、輪郭をなめらかにして画面へ出す。
+   それ以外は普通の R.render。万一エラーになったら自動で普通の描画に戻る */
+const FXR=(()=>{
+ if(GCFG.boot.aa!==1)return(sc,c)=>R.render(sc,c);
+ let rt=null,bad=false,mat=null,fs=null,fc=null,chk=false;const v2=new T.Vector2();
+ const VS='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
+ FS=`uniform sampler2D tDiffuse;uniform vec2 px;varying vec2 vUv;
+float lum(vec3 c){return dot(c,vec3(.299,.587,.114));}
+void main(){
+ vec4 cM=texture2D(tDiffuse,vUv);
+ vec4 cNW=texture2D(tDiffuse,vUv+vec2(-1.,-1.)*px),cNE=texture2D(tDiffuse,vUv+vec2(1.,-1.)*px),cSW=texture2D(tDiffuse,vUv+vec2(-1.,1.)*px),cSE=texture2D(tDiffuse,vUv+vec2(1.,1.)*px);
+ float lM=lum(cM.rgb),lNW=lum(cNW.rgb),lNE=lum(cNE.rgb),lSW=lum(cSW.rgb),lSE=lum(cSE.rgb);
+ float lMin=min(lM,min(min(lNW,lNE),min(lSW,lSE))),lMax=max(lM,max(max(lNW,lNE),max(lSW,lSE)));
+ vec2 dir=vec2(-((lNW+lNE)-(lSW+lSE)),(lNW+lSW)-(lNE+lSE));
+ float dr=max((lNW+lNE+lSW+lSE)*.03125,.0078125);
+ float rc=1./(min(abs(dir.x),abs(dir.y))+dr);
+ dir=min(vec2(8.),max(vec2(-8.),dir*rc))*px;
+ vec4 a=.5*(texture2D(tDiffuse,vUv+dir*(1./3.-.5))+texture2D(tDiffuse,vUv+dir*(2./3.-.5)));
+ vec4 b=a*.5+.25*(texture2D(tDiffuse,vUv+dir*-.5)+texture2D(tDiffuse,vUv+dir*.5));
+ float lB=lum(b.rgb);
+ gl_FragColor=(lB<lMin||lB>lMax)?a:b;
+}`;
+ const init=()=>{mat=new T.ShaderMaterial({uniforms:{tDiffuse:{value:null},px:{value:new T.Vector2()}},vertexShader:VS,fragmentShader:FS,depthTest:false,depthWrite:false,blending:T.NoBlending});
+  const q=new T.Mesh(new T.PlaneGeometry(2,2),mat);q.frustumCulled=false;fs=new T.Scene();fs.add(q);fc=new T.OrthographicCamera(-1,1,1,-1,0,1)};
+ const off=e=>{bad=true;try{R.setRenderTarget(null)}catch(_){}console.error('FXAA を停止しました(通常描画に切替)',e)};
+ return(sc,c)=>{
+  if(bad){R.render(sc,c);return}
+  try{
+   if(!mat)init();
+   R.getDrawingBufferSize(v2);const w=Math.max(1,v2.x|0),h=Math.max(1,v2.y|0);
+   if(!rt){rt=new T.WebGLRenderTarget(w,h,{minFilter:T.LinearFilter,magFilter:T.LinearFilter,format:T.RGBAFormat,depthBuffer:true,stencilBuffer:false});rt.texture.encoding=T.sRGBEncoding;mat.uniforms.tDiffuse.value=rt.texture}
+   else if(rt.width!==w||rt.height!==h)rt.setSize(w,h);
+   R.setRenderTarget(rt);R.render(sc,c);R.setRenderTarget(null);
+   mat.uniforms.px.value.set(1/w,1/h);R.render(fs,fc);
+   if(!chk){chk=true;try{const pr=R.properties.get(mat).currentProgram;if(pr&&pr.diagnostics&&pr.diagnostics.runnable===false)off('shader')}catch(e){}}
+  }catch(e){off(e);R.render(sc,c)}}})();
 /* ---------- 診断表示：描画で例外・シェーダーエラー・コンテキスト喪失が起きたら画面左上に赤字で出す。URLに ?debug=1 を付けると描画状況も常時表示 ---------- */
 const DIAG=(()=>{const L=[],always=/[?&]debug=1/.test(location.search);let el=null,fr=0,gl=null,last='';
  const show=()=>{try{if(!el){el=document.createElement('pre');el.style.cssText='position:fixed;left:6px;top:56px;max-width:92vw;max-height:62vh;overflow:hidden;margin:0;padding:4px 6px;background:rgba(0,0,0,.75);color:#ff9a9a;font:11px/1.35 monospace;white-space:pre-wrap;word-break:break-all;z-index:99999;pointer-events:none;border-radius:4px;text-align:left';document.body.appendChild(el)}el.textContent=(last?last+'\n':'')+L.slice(-12).join('\n')}catch(e){}};
@@ -80,7 +105,7 @@ const DIAG=(()=>{const L=[],always=/[?&]debug=1/.test(location.search);let el=nu
    last='map='+MAPID+' draws='+i.render.calls+' tris='+i.render.triangles+' progs='+(i.programs?i.programs.length:'?')+' tex='+i.memory.textures+' geo='+i.memory.geometries+' glErr='+e+' objs='+ch.length+'(visible '+vis+', instanced '+ins+', mesh '+msh+')';
    if(always||L.length)show()}catch(x){}}}})();
 const gs=new T.Scene(),ps=new T.Scene(),cam=new T.PerspectiveCamera(40,1,.5,90),pc=new T.PerspectiveCamera(35,1,.1,50);
-gs.background=new T.Color(HS?0xf7a8cf:KO?0xe3986c:0x1b1850);gs.fog=new T.Fog(HS?0xf7a8cf:KO?0xe3986c:0x1b1850,KV?170:45,KV?340:95);ps.background=new T.Color(0x1d0f3a);VFX.init(gs,cam);
+gs.background=new T.Color(THC?0xf7a8cf:THD?0xe3986c:0x1b1850);gs.fog=new T.Fog(THC?0xf7a8cf:THD?0xe3986c:0x1b1850,KV?170:45,KV?340:95);ps.background=new T.Color(0x1d0f3a);VFX.init(gs,cam);
 /* ノックアウト用カメラ：本家のスクリーンショット(2340×1080)から逆算した値。
    画角19.15°の望遠・注視点までの距離42.7マス・見下ろし角53.5°。遠近感が弱く、1マス≒77px(縦1080px時)。
    zm=注視点が行ける端(マップ端から4.93マス内側)。これより奥へは動かず、自陣側の手前の地形(柵・崖)まで画面に入る */
@@ -100,7 +125,7 @@ const mat=(c,e,r)=>new T.MeshStandardMaterial({color:c,roughness:r||.55,metalnes
 function P(p,g,c,x,y,z,s,o){o=o||{};const m=new T.Mesh(g,mat(c,o.e,o.r));m.position.set(x,y,z);m.scale.set(...(s||[1,1,1]));if(o.r2)m.rotation.set(...o.r2);m.castShadow=true;m.userData.e=o.e||0;if(!o.no){const l=new T.Mesh(g,OL);l.scale.setScalar(1.08);m.add(l)}p.add(m);return m}
 const KL={a:0xfff4ea,ai:1,hs:0xfff6ee,hg:0xe2a878,hi:.5,dc:0xfff2e0,di:1.15},KC=h=>[(h>>16&255)/255,(h>>8&255)/255,(h&255)/255];
 [[ps,.9],[gs,1.05]].forEach(([s,i])=>{if(KV&&s===gs){s.add(new T.AmbientLight(KL.a,KL.ai));s.add(new T.HemisphereLight(KL.hs,KL.hg,KL.hi))}else{s.add(new T.AmbientLight(0x9080d0,i));s.add(new T.HemisphereLight(0xb8a0ff,0x302040,.5))}});
-const dl=new T.DirectionalLight(KV?KL.dc:0xfff0e0,KV?KL.di:1.2);dl.castShadow=true;dl.shadow.mapSize.set(GQP.sm,GQP.sm);dl.shadow.bias=-.0004;Object.assign(dl.shadow.camera,KV?{left:-21,right:21,top:18,bottom:-18,near:1,far:80}:{left:-18,right:18,top:16,bottom:-16,near:1,far:70});gs.add(dl,dl.target);
+const dl=new T.DirectionalLight(KV?KL.dc:0xfff0e0,KV?KL.di:1.2);dl.castShadow=true;dl.shadow.mapSize.set(SHW?SHW.sm:1024,SHW?SHW.sm:1024);dl.shadow.bias=-.0004;Object.assign(dl.shadow.camera,KV?{left:-21,right:21,top:18,bottom:-18,near:1,far:80}:{left:-18,right:18,top:16,bottom:-16,near:1,far:70});gs.add(dl,dl.target);
 const dl2=dl.clone();dl2.castShadow=false;   /* ホーム/キャラ選択のプレビューには影を受ける物が無い。cloneで影の設定(2048)まで複製されて毎フレーム無駄な影描画をしていたので止める */
 if(KV){dl2.color.setHex(0xfff0e0);dl2.intensity=1.2}dl2.position.set(3,6,5);ps.add(dl2);
 
@@ -134,10 +159,13 @@ if(KO){g.length=0;for(let r=0;r<18;r++){g[r]=[...KOH[r]];if(r<17)g[34-r]=[...KOH
 if(HS){g.length=0;for(let r=0;r<17;r++){g[r]=[...HSH[r]];if(r<16)g[32-r]=[...HSH[r]].reverse()}}
 if(CMAP){g.length=0;for(const r of CMAP.rows)g.push([...r])}
 const tile=(x,z)=>x<0||z<0||x>=W||z>=H?'#':g[z][x],solid=(x,z)=>'#RKCBWF~SLMPY'.includes(tile(Math.floor(x),Math.floor(z))),bsolid=(x,z)=>'#RKCBW'.includes(tile(Math.floor(x),Math.floor(z))),inBush=(x,z)=>tile(Math.floor(x),Math.floor(z))=='b',MX=10.5,MZ=H/2,rnd=Math.random;
+/* 強奪の金庫の位置：マップの S のマス(下半分=自分チーム / 上半分=相手チーム)。置いていなければ従来の位置(真ん中の列・奥から4.5マス)に自動で置く。同じ側に2つ以上あれば余りは消す */
+const HSP=(()=>{const p=[null,null];if(!HS)return p;for(let z=0;z<H;z++)for(let x=0;x<W;x++)if(g[z][x]==='S'){const t=z+.5>=H/2?0:1;if(p[t])g[z][x]='.';else p[t]={x:x+.5,z:z+.5}}
+ if(!p[0]){p[0]={x:10.5,z:H-4.5};g[H-5][10]='S'}if(!p[1]){p[1]={x:10.5,z:4.5};g[4][10]='S'}return p})();
 /* 実際のシーン光(環境光+半球光+平行光)の合計。表示したい色を「ライティング後にその色に見える反射率」に直すために使う */
-const LU=KV?[0,1,2].map(i=>KC(KL.a)[i]*KL.ai+KC(KL.hs)[i]*KL.hi+KC(KL.dc)[i]*KL.di*.872):[2.0,1.83,2.24],LS=KV?[0,1,2].map(i=>KC(KL.a)[i]*KL.ai+(KC(KL.hs)[i]+KC(KL.hg)[i])/2*KL.hi+KC(KL.dc)[i]*KL.di*.39):[1.29,1.16,1.56],AN=Math.min(GQP.an,R.capabilities.getMaxAnisotropy());
+const LU=KV?[0,1,2].map(i=>KC(KL.a)[i]*KL.ai+KC(KL.hs)[i]*KL.hi+KC(KL.dc)[i]*KL.di*.872):[2.0,1.83,2.24],LS=KV?[0,1,2].map(i=>KC(KL.a)[i]*KL.ai+(KC(KL.hs)[i]+KC(KL.hg)[i])/2*KL.hi+KC(KL.dc)[i]*KL.di*.39):[1.29,1.16,1.56],AN=Math.min(8,R.capabilities.getMaxAnisotropy());
 function bakeTex(x,w,h,k){const L=[0,1,2].map(i=>LU[i]*(1-k)+LS[i]*k),d=x.getImageData(0,0,w,h),a=d.data,tb=L.map(l=>{const t=new Uint8ClampedArray(256);for(let i=0;i<256;i++)t[i]=Math.round(255*Math.pow(Math.min(1,Math.pow(i/255,2.2)/l),1/2.2));return t});for(let i=0;i<a.length;i+=4){a[i]=tb[0][a[i]];a[i+1]=tb[1][a[i+1]];a[i+2]=tb[2][a[i+2]]}x.putImageData(d,0,0)}
-function cv(w,h,f,rx,ry,k){const w0=w;if(w>GQP.tx&&w==h)w=h=GQP.tx;const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');if(w!==w0)x.scale(w/w0,w/w0);f(x);if(k!=null)bakeTex(x,w,h,k);const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=AN;if(rx)t.repeat.set(rx,ry);return t}
+function cv(w,h,f,rx,ry,k){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');f(x);if(k!=null)bakeTex(x,w,h,k);const t=new T.CanvasTexture(c);t.encoding=T.sRGBEncoding;t.wrapS=t.wrapT=T.RepeatWrapping;t.anisotropy=AN;if(rx)t.repeat.set(rx,ry);return t}
 const ln=(x,a,b,c,d)=>{x.beginPath();x.moveTo(a,b);x.lineTo(c,d);x.stroke()};
 const DM={},DY=[],bush=[],bd=new T.Object3D(),BSI={},bx=new T.BoxGeometry(1,1,1),std=o=>new T.MeshStandardMaterial(o);
 let stageFx,mineBurst,bsKill,mkGem,BM,BS,HSMK;   /* HSMK=強奪の金庫モデルを作る関数(下の { } の中で作って、外の強奪ロジックから使う) */
@@ -271,7 +299,7 @@ const BMAT=std({vertexColors:true,roughness:.95,side:2});
    葉は7頂点・5三角形の扁平な形(根元が細く中ほどが太く先がとがる)。束の広がりは±.14以内、倒れ込みもごく小さい */
 const BLK=KV?(()=>{const leaf=(w,h,yaw,lean,ox,oz)=>{const v=[-w*.5,0,0,w*.5,0,0,-w*.64,h*.4,0,w*.64,h*.4,0,-w*.46,h*.72,-h*.03,w*.46,h*.72,-h*.03,0,h,-h*.07],g=new T.BufferGeometry();
   g.setAttribute('position',new T.Float32BufferAttribute(v,3));g.setIndex([0,1,2,1,3,2,2,3,4,3,5,4,4,5,6]);g.computeVertexNormals();g.rotateX(lean);g.rotateY(yaw);g.translate(ox,0,oz);return g};
- return mgc(Array.from({length:12},()=>{const a=sr()*6.283,r=.03+sr()*.11;return leaf(.26+sr()*.1,.78+sr()*.26,(sr()-.5)*1.3,-.05+(sr()-.5)*.2,Math.cos(a)*r,Math.sin(a)*r*.8)}),HS?0xb8135a:0xf28a1a,HS?0xff5fa2:0xffd445,.75)})():null;
+ return mgc(Array.from({length:12},()=>{const a=sr()*6.283,r=.03+sr()*.11;return leaf(.26+sr()*.1,.78+sr()*.26,(sr()-.5)*1.3,-.05+(sr()-.5)*.2,Math.cos(a)*r,Math.sin(a)*r*.8)}),THC?0xb8135a:0xf28a1a,THC?0xff5fa2:0xffd445,.75)})():null;
 
 /* ===== 床 ===== */
 if(!KV){
@@ -298,10 +326,10 @@ const rockM=std({map:RT,vertexColors:true,roughness:.9}),crysM=()=>std({vertexCo
 regDM(RGA,rockM,IT.RA);regDM(RGB,rockM,IT.RB);
 regDM(CRG,std({map:CT,vertexColors:true,roughness:.75}),IT.C);regDM(CRG,std({map:XT,vertexColors:true,roughness:.7}),IT.X);
 regDM(CG,crysM(),IT.K);regDM(CG,crysM(),IT.PK,0,1);
-const aoM=t=>new T.MeshBasicMaterial({map:t,color:HS?dlin(0x5e1744):KO?dlin(0x6e2c1a):0x0a0310,transparent:true,opacity:KV?.42:.5,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
+const aoM=t=>new T.MeshBasicMaterial({map:t,color:THC?dlin(0x5e1744):THD?dlin(0x6e2c1a):0x0a0310,transparent:true,opacity:KV?.42:.5,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});
 regDM(AQ,aoM(AOR),IT.AO,0,0);regDM(AQ,aoM(AOC),IT.AC,0,0);
 /* 草むら：床に濃い青緑の下地を敷き、葉の束を重ねる */
-BS=inst(AQ,new T.MeshBasicMaterial({map:AOT,color:dlin(HS?0xc4175f:KO?0xe5892a:0x1f7f9a),transparent:true,opacity:.85,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),IT.BP,0,0);
+BS=inst(AQ,new T.MeshBasicMaterial({map:AOT,color:dlin(THC?0xc4175f:THD?0xe5892a:0x1f7f9a),transparent:true,opacity:.85,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),IT.BP,0,0);
 bsKill=(tx,tz)=>{const i=BSI[tz*W+tx];if(i!=null){BS.setMatrixAt(i,ZMX);BS.instanceMatrix.needsUpdate=true}};
 IT.b.forEach(o=>bush.push({...o,f:0}));
 BM=new T.InstancedMesh(KV?BLK:BLD,BMAT,bush.length);
@@ -310,12 +338,12 @@ BM.castShadow=false;gs.add(BM);
 
 /* ===== 線路・木の足場 ===== */
 if(!KV){const WL=[],SL=[],wp=(x,y,z,sx,sy,sz,o)=>WL.push({x,y,z,s:[sx,sy,sz],...(o||{})});
-[13.5,19.5].forEach(z=>[0,1].forEach(m=>{const f=x=>m?W-x:x;[-.2,.2].forEach(o=>SL.push({x:f(6.35),y:.1,z:z+o,s:[4.5,.08,.09]}));for(let i=0;i<9;i++)wp(f(4.4+i*.5),.045,z,.22,.07,.84,{r:(sr()-.5)*.1})}));
-[7,26].forEach(z=>[0,1].forEach(m=>{const f=x=>m?W-x:x,x=f(1.14);wp(x,.8,z-.9,.17,1.6,.17);wp(x,.8,z+.9,.17,1.6,.17);wp(x,1.58,z,.2,.17,2.3);wp(x,.78,z-.45,.1,1.05,.1,{rx:.62});wp(x,.78,z+.45,.1,1.05,.1,{rx:-.62})}));
+[MZ-3,MZ+3].forEach(z=>[0,1].forEach(m=>{const f=x=>m?W-x:x;[-.2,.2].forEach(o=>SL.push({x:f(6.35),y:.1,z:z+o,s:[4.5,.08,.09]}));for(let i=0;i<9;i++)wp(f(4.4+i*.5),.045,z,.22,.07,.84,{r:(sr()-.5)*.1})}));
+[7,H-7].forEach(z=>[0,1].forEach(m=>{const f=x=>m?W-x:x,x=f(1.14);wp(x,.8,z-.9,.17,1.6,.17);wp(x,.8,z+.9,.17,1.6,.17);wp(x,1.58,z,.2,.17,2.3);wp(x,.78,z-.45,.1,1.05,.1,{rx:.62});wp(x,.78,z+.45,.1,1.05,.1,{rx:-.62})}));
 inst(comp(rbox(.05,2,0),.2),std({map:WT,vertexColors:true,roughness:.85}),WL);
 inst(bx,std({color:new T.Color(...dcol(0x8e99bd,.3)),roughness:.45,metalness:.15}),SL);
 /* 床に落ちる線路の影 */
-inst(AQ,aoM(AOR),[13.5,19.5].flatMap(z=>[[6.3],[W-6.3]].map(([x])=>({x,y:.012,z,s:[5.2,1,1.6]}))),0,0);
+inst(AQ,aoM(AOR),[MZ-3,MZ+3].flatMap(z=>[[6.3],[W-6.3]].map(([x])=>({x,y:.012,z,s:[5.2,1,1.6]}))),0,0);
 }
 
 /* ===== 鉱山(中央の穴)・光・エメラルドの湧き ===== */
@@ -368,8 +396,8 @@ stageFx=dt=>{sx+=dt;mb=Math.max(0,mb-dt*1.5);const k=mb;
  for(const q of G){q.age=(q.age||0)+dt;const a=Math.min(1,q.age*5),e=1-Math.pow(1-a,3);q.m.scale.setScalar(.15+.85*e*(1+.18*Math.sin(a*Math.PI)));const st=q.m.userData.st;if(st)st.scale.setScalar(.12+.5*(.5+.5*Math.sin(sx*6+q.o*5)))}
  CGL.forEach((s,i)=>{s.material.opacity=.32+.12*Math.sin(sx*1.7+i*1.3)})};
 
-/* ===== ノックアウト：砂漠マップ(本家ノックアウトのマップを再現。21×35) ===== */
-if(KO){
+/* ===== 砂漠テーマ：本家ノックアウトの砂漠の見た目(21×35)。ルールが何でも、テーマが 'desert' の時にこの見た目になる ===== */
+if(THD){
  const WH=1.2,LOW=-2.3,V3=(x,y,z)=>new T.Vector3(x,y,z);
  const mx=(px,py,pz,sx,sy,sz,rx,ry,rz)=>new T.Matrix4().compose(V3(px,py,pz),new T.Quaternion().setFromEuler(new T.Euler(rx||0,ry||0,rz||0)),V3(sx==null?1:sx,sy==null?1:sy,sz==null?1:sz));
  const gc=(a,b,t,k)=>mix3(dcol(a,k),dcol(b,k),Math.max(0,Math.min(1,t)));
@@ -574,17 +602,15 @@ if(KO){
    [[-.275,.55,-.03],[-2.6,4.2,-.9],[-6.45,3.7,-1.7]].forEach(([cz,d,tp])=>{for(let x=-7;x<W+7;){const len=1.6+sr()*1.4,h=tp-LOW+sr()*.1,d2=d*(.97+sr()*.06),k=.95+sr()*.08;cl2.push({x:x+len/2,y:tp-h/2,z:f(cz),s:[len*1.02,h,d2],r:0,c:new T.Color(k,k*.98,k*.97)});x+=len}})}
   inst(BX,cmat2,cl2)}
 
- /* ---------- 見た目の仕上げ：中央の鉱山は隠す(ノックアウトでは使わない)・水面を動かす ---------- */
- mine.visible=false;beam.visible=false;ml.visible=false;MS.forEach(s=>{s.visible=false});
+ /* ---------- 見た目の仕上げ：水面を動かす(中央の鉱山を隠すかどうかはモードで決めるので、下の方でまとめて) ---------- */
  {const s0=stageFx;stageFx=dt=>{s0(dt);SH.offset.x+=dt*.035;SH.offset.y+=dt*.012}}
 }
 
-/* ===== 強奪(ヘイスト)：お菓子の国のステージ(本家のスクリーンショットを見ながら再現。21×33) =====
+/* ===== お菓子テーマ：強奪(ヘイスト)のお菓子の国の見た目(本家のスクリーンショットを見ながら再現。21×33) =====
    床=青緑のひし形タイル / 壁(W)=オレンジのハート型クッキー(壊せる) / ブッシュ(b)=ピンク赤の葉(上の共通処理で配置済み)
    L=青いロリポップ / M=ピンクのマシュマロ / P=ピンクのねじれロープ / Y=さくらんぼ  (どれも通れないが弾は通る)
    まわり=青緑の帯・巨大ロリポップ・わたあめの雲・虹・キャンディケイン・お城の門・カップケーキ・ドーナツ・チョココイン など */
-if(HS){
- mine.visible=false;beam.visible=false;ml.visible=false;MS.forEach(s=>{s.visible=false});
+if(THC){
  const LOWY=-.6,rg2=(a,b)=>a+(b-a)*sr(),TAU=Math.PI*2;
  const hcc=(h,k)=>new T.Color(...dcol(h,k==null?.35:k)),rf=h=>dcol(h,.35),hsm=(h,k,r,o)=>std(Object.assign({color:hcc(h,k),roughness:r==null?.7:r},o||{}));
  const mixc=(a,b,t)=>[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];
@@ -690,6 +716,13 @@ if(HS){
   const bar=(x,z,ry,rz)=>{const gr=grp(x,LOWY,z,1.6,ry);gr.rotation.z=rz||0;mesh(rbox(.12,2,0),hsm(0x5a3220,.4,.6),gr,0,2.4,0,1.5,2.4,.6);mesh(rbox(.1,2,0),hsm(0xf3e4c8,.45,.6),gr,0,2.4,.28,1.1,1.9,.12);mesh(rbox(.05,2,0),hsm(0xd9a96a,.4,.7),gr,0,.7,0,.34,1.4,.2)};
   bar(-5.4,H-3.5,.3,.45);bar(W+5.6,3.4,-.2,-.3)}
 
+}
+
+/* ---------- 中央の鉱山(ジェムの湧く所)は、エメラルドハントのルールの時だけ見せる(テーマには関係しない) ---------- */
+if(KO||HS){mine.visible=false;beam.visible=false;ml.visible=false;MS.forEach(q=>{q.visible=false})}
+
+/* ---------- 強奪のルールの時だけ作る金庫のモデル(テーマには関係しない) ---------- */
+if(HS){
  /* ---------- 金庫のモデル：下の強奪ロジック(hsMake)から呼ぶ。dcol/std はこの { } の中でしか使えないのでここで作る ---------- */
  /* 大きさ：横1.0 × 奥行き0.9 × 高さ1.0 (1マスにぴったり。当たり判定のタイルと同じ大きさ) */
  HSMK=team=>{
@@ -1127,7 +1160,7 @@ const saveTR=()=>{try{localStorage.setItem(TKEY,JSON.stringify(TRO))}catch(e){}}
    ・裏に待機している間(GF.p)は描画・動画・音を止める(最初の数フレームだけ描いてシェーダー等を準備しておく)
    ・手前に出る時(act)：トロフィーを読み直し、選択中のキャラを引き継いでホームを表示、BGM再開 */
 const GF={bg:/[?&]bg=1/.test(location.search),p:false,w:6,
-act(o){GF.p=false;RZ.small=0;try{rs()}catch(e){}kick();try{sfxWarm()}catch(e){}try{thumbs()}catch(e){}   /* 裏で縮めていた描画バッファを戻し、ループ・効果音の準備・サムネ生成を再開 */
+act(o){GF.p=false;RZ.small=0;applyRes(true);try{rs()}catch(e){}kick();try{sfxWarm()}catch(e){}try{thumbs()}catch(e){}   /* 裏で縮めていた描画バッファを戻し、ループ・効果音の準備・サムネ生成を再開 */
   try{const a=JSON.parse(localStorage.getItem(TKEY));if(Array.isArray(a))TRO=CH.map((_,i)=>Math.max(0,+a[i]||0))}catch(e){}
   if(o&&typeof o.sel=='number'&&CH[o.sel])setSel(o.sel);
   try{if(window.PF)PF.reload()}catch(e){}
@@ -1178,7 +1211,7 @@ function buildList(){const g=$('#cg');$('#clc').textContent=CH.length+'/'+CH.len
 /* 3Dモデルから上半身のサムネイルを撮ってカードに描く（テクスチャ未読込のモデルは後で再挑戦） */
 function makeThumb(i){
  if(state!='home'&&state!='list'&&state!='select'&&state!='room'&&state!='profile')return false;
- if(RZ.small)return false;drsApply(DRS.mx);   /* 縮小中の描画バッファでは撮れない／サムネは最大解像度で撮る */
+ if(RZ.small)return false;   /* 縮小中の描画バッファでは撮れない */
  const root=mk(i,null);root.rotation.y=.3;ps.add(root);
  const ob=ps.background,vs=[pv.visible,pf.visible,psh.visible];let ok=false;
  try{
@@ -1313,7 +1346,7 @@ function freezeUnit(e){if(e.rem)return;e.frost=1;e.fz=FZT;e.fzF=1;e.q=[];e.dash=
 function drive(u,dt,vx,vz){const iv=u.iv||(u.iv={x:0,z:0});if(u.oi>0){const k=Math.min(1,dt*1.6);iv.x+=(vx-iv.x)*k;iv.z+=(vz-iv.z)*k}else{iv.x=vx;iv.z=vz}const sx=u.x,sz=u.z;mv(u,iv.x*dt,iv.z*dt);if(u.oi>0){if(Math.abs(u.x-sx)<Math.abs(iv.x*dt)*.4)iv.x*=-.25;if(Math.abs(u.z-sz)<Math.abs(iv.z*dt)*.4)iv.z*=-.25;if(Math.hypot(iv.x,iv.z)>.4)u.mvg=1}}
 function mv(u,dx,dz){if(u.rem&&!u.dash)return;const r=u.c.wr!=null?u.c.wr:.34; if(!hit(u.x+dx,u.z,r))u.x+=dx;if(!hit(u.x,u.z+dz,r))u.z+=dz}
 /* ---------- 壁の破壊（外周の#は壊れない） ---------- */
-const TC={R:0xcdbff3,C:0xf4a533,K:0xe650e0,B:0x9a5a2a,W:HS?0xffa730:0xe0764f},ZMX=new T.Matrix4().makeScale(0,0,0),dO=new T.Object3D();
+const TC={R:0xcdbff3,C:0xf4a533,K:0xe650e0,B:0x9a5a2a,W:THC?0xffa730:0xe0764f},ZMX=new T.Matrix4().makeScale(0,0,0),dO=new T.Object3D();
 /* 1マスだけ壊す(演出つき)。マルチプレイで他の端末から「壊れた」と知らされたときにも使う */
 function brkT(tx,tz){if(tx<1||tz<1||tx>=W-1||tz>=H-1)return 0;const t=g[tz][tx],d=DM[tz*W+tx];if(!d||!TC[t])return 0;
  g[tz][tx]='.';delete DM[tz*W+tx];DY.push({d,t:0});fx(tx+.5,.6,tz+.5,TC[t],10);fx(tx+.5,.4,tz+.5,0xffffff,4);return 1}
@@ -2195,7 +2228,7 @@ if(KO)koUiInit();
    ・やられても少しすると復活する(ジェムグラブと同じ)。金庫に攻撃を当てても必殺技ゲージが溜まる
    ・数字を変えたい時は下の HSR を書き換える(HP=金庫のHP / T=制限時間(秒) / hit=金庫に弾が当たる半径。金庫は1マス(1.0)なので0.7=角まで届く大きさ)
    ・金庫は通常攻撃・投げ物の爆発・範囲技・ダッシュ・剣で壊せる。ブッシュや壁(クッキー)に隠れても弾は金庫に届く */
-const HSR={HP:80000,T:150,hit:.7,pos:[{x:10.5,z:H-4.5},{x:10.5,z:4.5}]};   /* pos[0]=自分チームの金庫(下) / pos[1]=相手チームの金庫(上) */
+const HSR={HP:80000,T:150,hit:.7,pos:[HSP[0],HSP[1]]};   /* pos[0]=自分チームの金庫(下) / pos[1]=相手チームの金庫(上)。位置はマップの S から(HSP) */
 const HSS={s:[null,null],t:0,over:0,fin:0,w:-1,on:false,ui:null};
 function hsUiInit(){
  document.documentElement.classList.add('hs-mode');
@@ -2466,24 +2499,16 @@ btn($('#atk'),0);btn($('#sup'),1);
 addEventListener('keydown',e=>{const k=e.key.toLowerCase();kb[k]=1;if(state=='play'&&P0.alive){if(k=='j'||k==' ')autoShot(P0,0);if(k=='k')autoShot(P0,1)}});addEventListener('keyup',e=>kb[e.key.toLowerCase()]=0);
 
 /* ---------- ループ ---------- */
-let last=performance.now(),runT=0,fNo=0,loopT=0;const cameraTarget=new T.Vector3();
-/* リフレッシュレートの測定とフレーム上限：120/144Hz画面でも60fpsまでに抑えて発熱・負荷を減らす(低スペック/ふつうのランクのみ。高性能は上限なし)。
-   低スペックのホーム/キャラ選択は30fps(回転するだけの画面なので見た目はほぼ同じ) */
-const HZ={iv:16.7,k:1,a:[],p:0};
-function hzMeasure(n){if(HZ.p){const d=n-HZ.p;if(d>3&&d<45)HZ.a.push(d)}HZ.p=n;
- if(HZ.a.length>=60){const a=HZ.a.sort((x,y)=>x-y),iv=a[12];HZ.a.length=0;HZ.iv=iv;HZ.k=Math.max(1,Math.floor(16.667/iv+.3))}}
-function capTh(){if(!GQP.c60)return 0;const iv=HZ.iv,k=(QT==0&&(state=='home'||state=='select'))?Math.max(HZ.k,Math.round(33.3/iv)):HZ.k;return k>1?iv*k-iv*.45:0}
+let last=performance.now(),loopT=0;const cameraTarget=new T.Vector3();
 function kick(){if(loopT){clearTimeout(loopT);loopT=0;requestAnimationFrame(loop)}}
 function loop(n){
  if(GF.p&&GF.w<=0){   /* 裏で待機中：描画せず、GPUメモリを空け、ループも間引く(手前に出る時は kick() ですぐ再開) */
   if(!RZ.small){RZ.small=1;try{R.setSize(1,1,false)}catch(e){}}
   loopT=setTimeout(()=>{loopT=0;requestAnimationFrame(loop)},150);return}
  requestAnimationFrame(loop);
- hzMeasure(n);const th=capTh();if(th&&n-runT<th)return;runT=n;
- const ms=n-last,dt=Math.min(.05,ms/1e3);last=n;if(GF.p)GF.w--;
+ const dt=Math.min(.05,(n-last)/1e3);last=n;if(GF.p)GF.w--;
  if(state=='list'||state=='room'||state=='maps'||state=='profile')return;
- if(state=='select'||state=='home'){drsApply(DRS.mx);hT+=dt*.8;pv.rotation.y=Math.sin(hT)*.4;if(pv.rig)GO.tick(pv.rig,null,dt);R.render(ps,pc);return}
- drsApply(DRS.pr);if(state=='play')drsTick(ms);
+ if(state=='select'||state=='home'){hT+=dt*.8;pv.rotation.y=Math.sin(hT)*.4;if(pv.rig)GO.tick(pv.rig,null,dt);FXR(ps,pc);return}
  if(state=='end'){RS.t+=dt;if(RS.ph==0&&RS.t>=1)resShow();if(RS.ph==1){resStep(dt);return}}
  if(state=='intro')introStep(dt);if(state=='play'){step(dt);bushUpd(dt)}if(MPG.on)MPG.tick(dt);stageFx(dt);
  const p=P0,cp=KO&&!p.alive?(U.find(u=>u.team==p.team&&u.alive)||p):p;shake=Math.max(0,shake-dt);
@@ -2494,9 +2519,7 @@ function loop(n){
   cz=it?IN.cz:KV?Math.min(H-KCAM.zm,Math.max(KCAM.zm,cp.z)):Math.min(H-6.5,Math.max(6.5,p.z)),
   ch=KV?kh:15*CD,co=KV?kz:7*CD,cl=KV?kz:7*CD+1;
  if(it)cam.position.set(cx,ch,cz+co);else cam.position.lerp(cameraTarget.set(cx+(Math.random()-.5)*shake,ch,cz+co+(Math.random()-.5)*shake),Math.min(1,dt*8));cam.lookAt(cam.position.x,0,cam.position.z-cl);
- /* 低スペックでは影を1フレームおきに更新(影の位置のブレを避けるため、光の位置も更新するフレームだけ動かす) */
- if(GQP.sk)R.shadowMap.autoUpdate=(++fNo<9)||(fNo&1)==0;
- if(R.shadowMap.autoUpdate){const lx=KV?cx:it?cx:p.x,lz=KV?cz:it?cz+1:p.z;dl.position.set(lx+6,18,lz+8);dl.target.position.set(lx,0,lz)}
+ {const lx=KV?cx:it?cx:p.x,lz=KV?cz:it?cz+1:p.z;dl.position.set(lx+6,18,lz+8);dl.target.position.set(lx,0,lz)}
  const am=aim.m,s0=aim.sp?p.c.s:p.c.a;let cs=[],ln=0,ad=0,ow=0;
  if(aim.on&&p.alive){const A=aim.a;
   if(s0.lob){const D=lobD(s0,aim.d);cs=lobPts(p,A,D,s0).map(q=>[q.x,q.z,s0.aoe+.4,s0.can?0x4ad0ff:undefined]);ln=1;ad=D}
@@ -2510,7 +2533,7 @@ function loop(n){
  const TK=!aim.sp&&p.tf&&p.c.tf?p.c.tf:null,fan=!!(aim.on&&p.alive&&(TK||s0.fan)&&!ln);am.visible=!fan&&!TK&&!!(aim.on&&p.alive&&(ln||(!s0.na&&!cs.length)));
  if(aim.f){aim.f.visible=fan;if(fan){const sp0=TK?TK.arc*Math.PI/180:s0.spr,rg0=TK?TK.reach:s0.rng;if(aim.f.userData.k!=sp0){aim.f.userData.k=sp0;aim.f.geometry=fanGeo(sp0)}aim.f.position.set(p.x,.06,p.z);aim.f.rotation.y=Math.PI/2-aim.a;aim.f.scale.set(rg0,1,rg0)}}
  if(am.visible){const s=s0;am.material.color.setHex(ow?0x4a9cff:0xffffff);am.position.x=p.x;am.position.z=p.z;am.rotation.y=Math.PI/2-aim.a;if(ln)am.scale.set(ow||.08,1,ad||Math.hypot(cs[0][0]-p.x,cs[0][1]-p.z));else am.scale.set(s.tf?s.w:s.n>1?Math.min(s.rng*(s.spr||.5),4):s.pierce?.7:.5,1,s.rng)}
- try{R.render(gs,cam);DIAG.frame(gs)}catch(e){DIAG.err('render',e)}}
+ try{FXR(gs,cam);DIAG.frame(gs)}catch(e){DIAG.err('render',e)}}
 requestAnimationFrame(loop);
 
 /* マップ選択・ホームのイベント枠(i)は mapselect.js */

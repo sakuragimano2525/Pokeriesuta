@@ -459,3 +459,27 @@ html.hs-mode #clock{position:relative;z-index:2;min-width:15vmin;padding:.7vmin 
 #hst .hsb i{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(#9bebff,#38b9ff 55%,#1a8ae0);transition:width .15s}
 #hst .hsb.r i{left:auto;right:0;background:linear-gradient(#ff9aa2,#ff4552 55%,#d01a2c)}
 #hst .hsb b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:4.6vmin;line-height:1;color:#fff}
+
+/* ============================================================ 設定（ホーム右上の歯車／解像度・アンチエイリアス・影・マップ先読み） ============================================================ */
+#home #hcfg { position:absolute;right:3.5%;top:2.6vmin;width:11.8vmin;height:11.8vmin;border-radius:1.4vmin;background:linear-gradient(#3a4263,#272d49);border:.5vmin solid #0c1226;border-bottom-width:1vmin;display:flex;align-items:center;justify-content:center }
+#home #hcfg:active { transform:translateY(.6vmin) }
+#hcfg svg { width:7.4vmin;height:7.4vmin;filter:drop-shadow(0 .4vmin 0 #0008);pointer-events:none }
+/* setting.png があれば、それを歯車アイコンとして使う(無ければ上の標準アイコン) */
+html.has-setting #hcfg svg { display:none }
+html.has-setting #hcfg::before { content:'';width:8.4vmin;height:8.4vmin;background:url(setting.png) center/contain no-repeat;filter:drop-shadow(0 .4vmin 0 #0008);pointer-events:none }
+#st { z-index:50;background:rgba(5,8,30,.72);pointer-events:auto }
+#stc { position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(104vmin,94%);max-height:94%;overflow:auto;padding:3vmin 3vmin 2.6vmin;border-radius:1.6vmin;background:linear-gradient(#3a4263,#272d49);border:.5vmin solid #0c1226;border-bottom-width:1vmin;display:flex;flex-direction:column;gap:1.5vmin }
+#stt { font-size:3.8vmin;line-height:1.1 }
+#stl { display:flex;flex-direction:column;gap:1.5vmin }
+.str { display:flex;flex-wrap:wrap;align-items:center;gap:.5vmin 2vmin;padding:1.2vmin 1.6vmin;border-radius:1.1vmin;background:rgba(5,8,30,.35) }
+.str>b { flex:1 1 30vmin;font-size:3.2vmin;line-height:1.1 }
+.stg { display:flex;gap:1vmin;flex:none }
+.stg button { font:inherit;font-size:3.2vmin;color:#fff;cursor:pointer;min-width:13vmin;height:7.6vmin;padding:0 2vmin;border-radius:1.1vmin;border:.5vmin solid #000;border-bottom-width:.9vmin;background:linear-gradient(#5a6590,#3a4263) }
+.stg button.on { background:linear-gradient(#ffe85a,#ffbf00);border-bottom-color:#8a5a00 }
+.stg button:active { transform:translateY(.5vmin) }
+.str small { flex:1 0 100%;font-size:2.5vmin;line-height:1.2;color:#cfe0ff }
+#stn { margin:0;font-size:2.5vmin;line-height:1.2;color:#ffd23f }
+#stb { display:flex;gap:2vmin;justify-content:flex-end }
+#stb button { font:inherit;font-size:3.4vmin;color:#fff;cursor:pointer;height:8.2vmin;min-width:22vmin;padding:0 3vmin;border-radius:1.2vmin;border:.5vmin solid #000;border-bottom-width:1vmin;background:linear-gradient(#5a6590,#3a4263) }
+#stb #sto { background:linear-gradient(#ffe85a,#ffbf00);border-bottom-color:#8a5a00 }
+#stb button:active { transform:translateY(.5vmin) }

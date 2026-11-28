@@ -28,7 +28,9 @@
       maps: [{ id: 'hs', name: 'お菓子の金庫室', bg: 'candy' }] }
   ];
   /* マップメーカーで作った maps.js のマップを、モードごとのカード一覧に足す */
-  (window.MAPS || []).forEach(m => { if (m.builtin) return; const md = MODES.find(x => x.id === m.mode); if (md) md.maps.push({ id: m.id, name: String(m.name).replace(/[<>&"]/g, ''), bg: m.mode === 'ko' ? 'desert' : m.mode === 'hs' ? 'candy' : 'cave' }); });
+  /* マップのテーマ(見た目)：maps.js の "theme"('cave'=洞窟 / 'desert'=砂漠 / 'candy'=お菓子)。無ければモードのもとのテーマ。ルール(mode)とは別々に選べる */
+  const themeOf = m => (m.theme === 'cave' || m.theme === 'desert' || m.theme === 'candy') ? m.theme : m.mode === 'ko' ? 'desert' : m.mode === 'hs' ? 'candy' : 'cave';
+  (window.MAPS || []).forEach(m => { if (m.builtin) return; const md = MODES.find(x => x.id === m.mode); if (md) md.maps.push({ id: m.id, name: String(m.name).replace(/[<>&"]/g, ''), bg: themeOf(m) }); });
   const ALL = [];
   MODES.forEach(m => m.maps.forEach(mp => ALL.push({ mode: m, map: mp })));
   const cur = () => ALL.find(e => e.map.id === MAPID) || ALL[0];
@@ -145,19 +147,20 @@
 
   /* ---------- 簡易マップ ---------- */
   const PAL = {
-    gem: { bg: '#6c5462', '#': '#252a78', R: '#d8d0f4', K: '#e650e0', C: '#e0963a', B: '#8f5a2c', b: '#2fbfa0' },
-    ko: { bg: '#f4a775', F: '#c98a4b', W: '#d0613f', '~': '#2fa3f0', b: '#f1a31a', C: '#e0963a', B: '#8f5a2c', c: '#3fa860' },
+    gem: { bg: '#6c5462', '#': '#252a78', R: '#d8d0f4', K: '#e650e0', C: '#e0963a', B: '#8f5a2c', b: '#2fbfa0', S: '#4f86d8' },
+    ko: { bg: '#f4a775', F: '#c98a4b', W: '#d0613f', '~': '#2fa3f0', b: '#f1a31a', C: '#e0963a', B: '#8f5a2c', c: '#3fa860', S: '#4f86d8' },
     hs: { bg: '#3f8791', W: '#f7a31f', S: '#4f86d8', b: '#e0307f', L: '#2f8cff', M: '#ff9fc8', P: '#e0307f', Y: '#e0123a' }
   };
-  const NAMES = { '#': 'がけ', R: '岩', K: 'クリスタル', C: '木箱', B: 'たる', W: '壁(壊せる攻撃で壊れる)', F: '柵', '~': '水', b: 'ブッシュ', c: 'サボテン', S: '金庫', L: 'ロリポップ', M: 'マシュマロ', P: 'ロープ', Y: 'さくらんぼ' };
+  const NAMES = { '#': 'がけ', R: '岩', K: 'クリスタル', C: '木箱', B: 'たる', W: '壁(壊せる攻撃で壊れる)', F: '柵', '~': '水', b: 'ブッシュ', c: 'サボテン', S: '金庫(HP 80000)', L: 'ロリポップ', M: 'マシュマロ', P: 'ロープ', Y: 'さくらんぼ' };
   const NAMES_HS = { W: 'クッキーの壁(壊せる攻撃で壊れる)', L: 'ロリポップ(通れないが弾は通る)', M: 'マシュマロ(通れないが弾は通る)', P: 'キャンディロープ(通れないが弾は通る)', Y: 'さくらんぼ(通れないが弾は通る)', S: '金庫(HP 80000)', b: 'ブッシュ' };
-  const SPAWN = { gem: { b: 30.5, t: 2.5 }, ko: { b: 33.5, t: 1.5 }, hs: { b: 32.25, t: 0.75 } };
+  const SPAWN = { gem: { b: 30.5, t: 2.5 }, ko: { b: 33.5, t: 1.5 }, hs: { b: 32.25, t: 0.75 } };   /* キー: gem=洞窟 / ko=砂漠 / hs=お菓子 のテーマ */
+  const PK = { cave: 'gem', desert: 'ko', candy: 'hs' };   /* テーマ → パレット・出撃位置のキー */
   const SPX = [8.5, 10.5, 12.5];
   const SPP = {};
   Object.keys(SPAWN).forEach(k => { SPP[k] = { b: SPX.map(x => [x, SPAWN[k].b]), t: SPX.map(x => [x, SPAWN[k].t]) }; });
-  (window.MAPS || []).forEach(m => { if (m.builtin) return; PAL[m.id] = PAL[m.mode]; const s = m.spawn || {}; SPP[m.id] = { b: s.blue || SPP[m.mode].b, t: s.red || SPP[m.mode].t }; });
+  (window.MAPS || []).forEach(m => { if (m.builtin) return; const k = PK[themeOf(m)]; PAL[m.id] = PAL[k]; const s = m.spawn || {}; SPP[m.id] = { b: s.blue || SPP[k].b, t: s.red || SPP[k].t }; });
 
-  function drawMap(cv, key) {
+  function drawMap(cv, key, modeId) {
     const rows = MAPROWS[key], pal = PAL[key], T = 16, w = 21, h = rows.length;
     cv.width = w * T; cv.height = h * T;
     const x = cv.getContext('2d');
@@ -192,7 +195,7 @@
       if (t === 'C') { x.beginPath(); x.moveTo(px + 3, py + 3); x.lineTo(px + T - 3, py + T - 3); x.moveTo(px + T - 3, py + 3); x.lineTo(px + 3, py + T - 3); x.stroke(); }
     }
     /* 中央(ジェムの湧く場所) */
-    const cx = 10.5 * T, cz = pal === PAL.hs ? -99 : h / 2 * T;   /* 強奪にはジェムの湧く場所が無い(画面の外に描いて消す) */
+    const cx = 10.5 * T, cz = modeId !== 'gem' ? -99 : h / 2 * T;   /* ジェムの湧く場所があるのはエメラルドハントだけ(ノックアウト・強奪は画面の外に描いて消す) */
     x.fillStyle = 'rgba(255,92,230,.9)'; x.strokeStyle = '#fff'; x.lineWidth = 2;
     x.beginPath(); x.moveTo(cx, cz - T * .8); x.lineTo(cx + T * .8, cz); x.lineTo(cx, cz + T * .8); x.lineTo(cx - T * .8, cz); x.closePath(); x.fill(); x.stroke();
     /* 出撃位置：下＝自分のチーム(青)、上＝相手(赤) */
@@ -211,12 +214,12 @@
     $('#mpi').innerHTML = iconHTML(e.mode.id);
     $('#mpa').textContent = e.mode.name; $('#mpb').textContent = e.map.name;
     $('#mpd').textContent = e.mode.rule;
-    const rows = drawMap($('#mpm'), key), seen = {};
+    const rows = drawMap($('#mpm'), key, e.mode.id), seen = {};
     rows.forEach(r => { for (const t of r) seen[t] = 1; });
     const L = $('#mpl'); L.innerHTML = '';
     const add = (c, n) => { const s = document.createElement('span'); s.innerHTML = `<i style="background:${c}"></i>${n}`; L.appendChild(s); };
-    Object.keys(NAMES).forEach(t => { if (seen[t] && PAL[key][t]) add(PAL[key][t], (e.mode.id === 'hs' && NAMES_HS[t]) || NAMES[t]); });
-    if (e.mode.id !== 'hs') add('#ff5ce6', 'ジェムが出る場所');
+    Object.keys(NAMES).forEach(t => { if (seen[t] && PAL[key][t]) add(PAL[key][t], (e.map.bg === 'candy' && NAMES_HS[t]) || NAMES[t]); });
+    if (e.mode.id === 'gem') add('#ff5ce6', 'ジェムが出る場所');
     add('#37a3ff', '自分のチームの出撃位置');
     add('#ff4a4a', '相手の出撃位置');
     P.hidden = false;
